@@ -300,3 +300,7 @@ button.li:hover,a.li:hover,.li.click:hover{background:#FAFAFB;cursor:pointer}
 
 /* Fixel tnum = моноширинні цифри з перекресленою 7 — вимкнено глобально (рішення Гері, ревʼю 10.11) */
 *,*::before,*::after{font-variant-numeric:normal!important}
+
+/* контент: розтягується до 1600 і стоїть по центру робочої області (Егор, 10.11) */
+.page,.mn-page,.cal-listpage{max-width:1600px;margin-left:auto;margin-right:auto;width:100%;box-sizing:border-box}
+.page.narrow{max-width:960px}
