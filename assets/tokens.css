@@ -1,0 +1,45 @@
+/* Slotly — базовые токены (v0, ночь 07→08.10). ОДИН источник для всех прототипов.
+   Платформа: белая, спокойная, плотная в админке (Linear-тон), тёплая в записи клиента
+   (бренд салона важнее бренда Slotly → --brand переопределяется салоном). */
+@font-face{font-family:Fixel;src:url(fonts/FixelText-Regular.woff2) format("woff2");font-weight:400;font-display:swap}
+@font-face{font-family:Fixel;src:url(fonts/FixelText-Medium.woff2) format("woff2");font-weight:500;font-display:swap}
+@font-face{font-family:Fixel;src:url(fonts/FixelText-SemiBold.woff2) format("woff2");font-weight:600;font-display:swap}
+@font-face{font-family:Fixel;src:url(fonts/FixelText-Bold.woff2) format("woff2");font-weight:700;font-display:swap}
+@font-face{font-family:FixelDisplay;src:url(fonts/FixelDisplay-Medium.woff2) format("woff2");font-weight:500;font-display:swap}
+@font-face{font-family:FixelDisplay;src:url(fonts/FixelDisplay-SemiBold.woff2) format("woff2");font-weight:600;font-display:swap}
+
+:root{
+  /* поверхности */
+  --bg:#FFFFFF; --canvas:#F7F7F8; --soft:#F2F2F4; --soft-2:#E9E9EC;
+  /* текст */
+  --ink:#121214; --ink-2:#3A3A3F; --mute:#6E6E73; --faint:#8A8A90; --off:#C7C7CC;
+  /* линии */
+  --line:#ECECEF; --line-strong:#D9D9DE;
+  /* акцент платформы (выбор, «сейчас», фокус) — один. Действия = чёрные кнопки */
+  --accent:#0A7A5A;      /* глубокий изумруд, 5.3:1 на белом */
+  --accent-soft:#E6F3EE;
+  /* бренд салона на клиентских страницах (переопределяется) */
+  --brand:var(--ink); --brand-ink:#fff;
+  /* статусы записей (фон / текст) — цвет = смысл, не декор */
+  --st-new:#EEF2FF;      --st-new-ink:#3346B8;      /* нова, не підтверджена */
+  --st-ok:#E8F5EE;       --st-ok-ink:#1F7A4D;       /* підтверджена */
+  --st-here:#FFF4E0;     --st-here-ink:#9A5B00;     /* клієнт прийшов */
+  --st-paid:#F2F2F4;     --st-paid-ink:#3A3A3F;     /* оплачено/завершено */
+  --st-noshow:#FDECEC;   --st-noshow-ink:#B42318;   /* не прийшов */
+  --st-block:repeating-linear-gradient(135deg,#F2F2F4 0 6px,#FAFAFB 6px 12px); /* перерва/блок */
+  --danger:#B42318; --ok:#1F7A4D; --warn:#9A5B00;
+  /* форма */
+  --r-xl:22px; --r-lg:16px; --r-md:12px; --r-sm:8px; --r-pill:999px;
+  --sh-1:0 1px 2px rgba(18,18,20,.06); --sh-2:0 1px 2px rgba(18,18,20,.05),0 12px 32px -12px rgba(18,18,20,.18);
+  --ease:cubic-bezier(.23,1,.32,1);
+  --font:Fixel,system-ui,-apple-system,"Segoe UI",sans-serif; --font-d:FixelDisplay,Fixel,system-ui,sans-serif;
+  /* шкала текста */
+  --t-xs:12px; --t-sm:13px; --t-md:15px; --t-lg:17px; --t-xl:22px; --t-2xl:28px; --t-3xl:40px;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;font-family:var(--font);font-size:var(--t-md);line-height:1.45;color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased;font-feature-settings:"ss01" 0}
+.num{font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}

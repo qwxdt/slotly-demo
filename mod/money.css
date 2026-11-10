@@ -1,0 +1,217 @@
+/* MONEY: Каса, Витрати, Зарплати, Сертифікати, Абонементи. Префікс .mn- */
+.mn-page{max-width:1280px}
+.mn-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px 20px;flex-wrap:wrap;margin-bottom:14px}
+.mn-ttl h2{margin:0;font-family:var(--font-d);font-size:26px;font-weight:600;letter-spacing:-.02em;line-height:1.15}
+.mn-ttl p{margin:4px 0 0;color:var(--mute);font-size:13.5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.mn-daynav{display:flex;align-items:center;gap:6px}
+.mn-date{width:150px;padding:0 10px}
+.mn-mon{min-width:128px;text-align:center;font-weight:600;font-size:14px}
+.mn-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.mn-actions .seg{max-width:100%}
+.mn-note{margin-bottom:14px}
+.mn-fn{margin:10px 0 0;font-size:12.5px;line-height:1.45;color:var(--mute)}
+.mn-fn:empty{display:none}
+.mn-lockb{vertical-align:middle}
+.mn-kpis,.mn-kpis4,.mn-kpis3{margin-bottom:16px}
+.mn-kpis{grid-template-columns:repeat(5,minmax(0,1fr))}
+.mn-kpis3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.mn-cols{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(300px,1fr);gap:16px;align-items:start}
+.mn-main,.mn-side{display:flex;flex-direction:column;gap:16px;min-width:0}
+.mn-card{padding:16px 18px}
+.mn-none{padding:16px 18px;color:var(--mute);font-size:13.5px}
+.mn-sec{font-size:12.5px;font-weight:600;color:var(--ink-2);margin-bottom:8px}
+
+/* тиждень */
+.mn-week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;margin-bottom:14px}
+.mn-wd{position:relative;display:flex;flex-direction:column;align-items:center;gap:1px;padding:7px 2px 9px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--bg);cursor:pointer;min-height:64px;min-width:0}
+.mn-wd:hover{background:var(--canvas)}
+.mn-wd .w{font-size:11.5px;color:var(--mute);font-weight:500}
+.mn-wd b{font-size:16px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2}
+.mn-wd small{font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mn-wd.today b{color:var(--accent)}
+.mn-wd.on{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.mn-wd i{position:absolute;top:6px;right:6px;width:6px;height:6px;border-radius:50%;background:transparent}
+.mn-wd i.lock{background:var(--ok)}.mn-wd i.warn{background:var(--warn)}.mn-wd i.open{background:var(--off)}
+
+/* платежі */
+.mn-unpaid .card-h{background:var(--st-here);color:var(--st-here-ink);border-bottom-color:transparent}
+.mn-unpaid .card-h .mute{color:inherit;opacity:.75}
+.mn-lk{background:none;border:0;padding:0;text-align:left;cursor:pointer;color:inherit;min-width:0;font:inherit}
+.mn-lk:hover{text-decoration:underline}
+.mn-ul .li .t{align-self:center}
+.mn-amt{font-weight:600;white-space:nowrap}
+.mn-pay{align-items:flex-start}
+.mn-tm{width:42px;flex:none;color:var(--mute);font-size:13px;padding-top:1px}
+.mn-sub{display:block;color:var(--mute);font-size:12.5px}
+.mn-lines{display:flex;gap:4px 8px;flex-wrap:wrap;margin-top:4px}
+.mn-ln{font-size:12px;color:var(--mute);background:var(--canvas);border-radius:6px;padding:1px 7px}
+.mn-ln b{color:var(--ink);font-weight:600}
+.mn-ln.tip{color:var(--accent);background:var(--accent-soft)}.mn-ln.tip b{color:var(--accent)}
+.mn-ln.neg b{color:var(--danger)}
+.mn-r{display:flex;align-items:center;gap:4px;flex:none}
+.mn-sp{width:36px;flex:none}
+.mn-sm{font-size:12.5px}
+.mn-pay.refund .mn-amt{color:var(--danger)}
+
+/* готівка/способи */
+.mn-rec{display:flex;flex-direction:column}
+.mn-rr{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:7px 0;font-size:13.5px;border-bottom:1px solid var(--line)}
+.mn-rr:last-child{border-bottom:0}
+.mn-rr span{color:var(--ink-2);min-width:0}
+.mn-rr span i{color:var(--mute);font-style:normal}
+.mn-rr b{font-weight:600;white-space:nowrap}
+.mn-rr.tot{border-top:1.5px solid var(--ink);border-bottom:0;margin-top:4px;padding-top:11px;font-size:15px}
+.mn-rr.tot span{color:var(--ink);font-weight:600}
+.mn-rr.big{font-size:15px}
+.mn-rr.big b{font-size:17px}
+.mn-rr.ok b{color:var(--ok)}.mn-rr.neg b{color:var(--danger)}.mn-rr.warn b{color:var(--warn)}
+.mn-rr .icobtn{margin:-6px -8px -6px 0}
+.mn-meth{display:flex;flex-direction:column}
+.mn-mr{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+.mn-mr:last-child{border-bottom:0}
+.mn-mr .t{flex:1;min-width:0}
+.mn-mr .t b{display:block;font-weight:600;font-size:13.5px}
+.mn-mr .t small{display:block;color:var(--mute);font-size:12px}
+.mn-mr .r{text-align:right}
+.mn-mr .r b{display:block;font-weight:600;font-size:13.5px}
+.mn-mr .r small{display:block;color:var(--mute);font-size:12px}
+.mn-mr.mut{opacity:.7}
+.mn-mr.tot{border-top:1.5px solid var(--ink);margin-top:4px;padding-top:12px}
+.mn-mr.tot .r b{font-size:15px}
+.mn-mi{width:28px;height:28px;border-radius:8px;background:var(--canvas);display:grid;place-items:center;color:var(--ink-2);flex:none}
+
+/* калькулятор */
+.mn-calc{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mn-quick{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.mn-change{margin-top:12px;padding:12px 14px;border-radius:var(--r-md);background:var(--canvas);font-size:14px}
+.mn-change b{font-family:var(--font-d);font-size:20px}
+.mn-change small{display:block;color:var(--mute);margin-top:2px}
+.mn-change.ok{background:var(--st-ok);color:var(--st-ok-ink)}
+.mn-change.neg{background:var(--st-noshow);color:var(--st-noshow-ink)}
+.mn-change.ok small{color:inherit;opacity:.8}
+
+/* закриття дня */
+.mn-closed h3{color:var(--ok)}
+.mn-cd{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:20px}
+.mn-den{display:flex;flex-direction:column;gap:6px}
+.mn-dr{display:grid;grid-template-columns:62px minmax(0,1fr) 72px;gap:8px;align-items:center}
+.mn-dr .nom{font-weight:600;font-size:13.5px}
+.mn-dr .sub{text-align:right;color:var(--mute);font-weight:500;font-size:13px}
+.mn-step{display:grid;grid-template-columns:36px minmax(0,1fr) 36px;gap:4px}
+.mn-step.wide{grid-template-columns:minmax(0,1fr)}
+.mn-step .inp{text-align:center;padding:0 4px;height:36px}
+.mn-step .icobtn{width:36px;height:36px}
+.mn-cd-tot{border:1px solid var(--line);border-radius:var(--r-md);padding:4px 14px;margin-bottom:14px}
+
+/* витрати */
+.mn-filter{display:flex;gap:8px;margin:0 0 12px}
+.mn-cats h3 .btn{margin-left:auto}
+.mn-stack{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--soft);gap:2px;margin:2px 0 12px}
+.mn-stack i{display:block;height:100%;min-width:3px}
+.mn-catlist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 24px}
+.mn-cl{display:flex;align-items:center;gap:8px;min-height:36px;padding:0 8px;margin:0 -8px;border:0;border-radius:var(--r-sm);background:none;cursor:pointer;text-align:left;font-size:13.5px;min-width:0}
+.mn-cl:hover{background:var(--canvas)}
+.mn-cl.on{background:var(--soft)}
+.mn-cl .dot{width:8px;height:8px;border-radius:50%;flex:none}
+.mn-cl .n{flex:1}
+.mn-cl small{width:34px;text-align:right}
+.mn-pend td{background:repeating-linear-gradient(135deg,#FAFAFB 0 6px,#fff 6px 12px)}
+.mn-pend td:first-child{box-shadow:inset 3px 0 0 var(--off)}
+.mn-catrow{display:flex;align-items:center;gap:8px}
+.mn-catrow .inp{flex:1}
+.mn-catrow>b{font-weight:600}
+.mn-exp .tbl td{height:48px}
+
+/* зарплати */
+.mn-prt .tbl td{height:56px}
+.mn-prt .tbl th,.mn-prt .tbl td{padding:0 10px}
+.mn-prcards{display:flex;flex-direction:column;gap:8px}
+.mn-prc{display:block;width:100%;text-align:left;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--bg);cursor:pointer}
+.mn-prc:hover{background:var(--canvas)}
+.mn-prc-g{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+.mn-prc-g span{font-size:11.5px;color:var(--mute)}
+.mn-prc-g b{display:block;font-size:13.5px;color:var(--ink);font-weight:600;margin-top:1px}
+.mn-dw{display:flex;flex-direction:column;gap:14px}
+.mn-dw-big{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden}
+.mn-dw-big>div{padding:12px 14px;border-left:1px solid var(--line);min-width:0}
+.mn-dw-big>div:first-child{border-left:0}
+.mn-dw-big small{display:block;color:var(--mute);font-size:12px}
+.mn-dw-big b{font-family:var(--font-d);font-size:20px;font-weight:600;white-space:nowrap}
+.mn-dw-act{display:flex;gap:8px;flex-wrap:wrap}
+.mn-lines-t{overflow-x:auto}
+.mn-lt td{height:48px}
+.mn-lt th,.mn-lt td{padding:0 10px}
+.mn-dayh{display:flex;justify-content:space-between;padding:8px 16px;background:var(--canvas);border-bottom:1px solid var(--line);font-size:12.5px;color:var(--ink-2)}
+
+/* сертифікати / абонементи */
+.mn-gl .li{gap:14px}
+.mn-gic{width:36px;height:36px;border-radius:10px;background:var(--canvas);display:grid;place-items:center;color:var(--ink-2);flex:none}
+.mn-code{font-family:var(--font-d);font-weight:600;letter-spacing:.04em}
+.mn-gm{width:170px;flex:none;display:flex;flex-direction:column;gap:6px}
+.mn-gm .r{text-align:right}
+.mn-gs{width:128px;flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.mn-bb i{background:var(--ink)}
+.mn-bb.used i{background:var(--off)}.mn-bb.expired i{background:var(--danger)}
+.mn-gd{display:flex;flex-direction:column;gap:14px}
+.mn-gcard{border:1px solid var(--ink);border-radius:var(--r-lg);padding:18px 20px;display:flex;flex-direction:column;gap:10px}
+.mn-gcard.used,.mn-gcard.expired{border-color:var(--line-strong)}
+.mn-gcard-t{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:15px}
+.mn-gbal b{font-family:var(--font-d);font-size:34px;font-weight:600;letter-spacing:-.02em}
+.mn-gbal small{display:block;color:var(--mute);font-size:13px}
+.mn-gcard-f{display:flex;justify-content:space-between;font-size:12.5px;color:var(--mute)}
+.mn-opt{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border:1px solid var(--line-strong);border-radius:var(--r-md);cursor:pointer}
+.mn-opt:has(input:checked){border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.mn-opt input{margin-top:3px;accent-color:var(--ink)}
+.mn-opt b{display:block;font-weight:600;font-size:14px}
+.mn-opt small{display:block;color:var(--mute);font-size:12.5px;line-height:1.4;margin-top:2px}
+.mn-sell{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px}
+.mn-picked{display:flex;align-items:center;gap:10px;padding:6px 6px 6px 10px;border:1px solid var(--line-strong);border-radius:var(--r-sm);min-height:40px}
+.mn-svcpick{display:flex;flex-direction:column;gap:2px;max-height:320px;overflow:auto;border:1px solid var(--line);border-radius:var(--r-md);padding:6px 10px}
+.mn-svcpick .check{min-height:34px}
+
+@media (max-width:1100px){
+  .mn-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .mn-cols{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:899px){
+  .mn-ttl h2{font-size:22px}
+  .mn-head{align-items:stretch}
+  .mn-daynav{width:100%}.mn-date{flex:1;width:auto}
+  .mn-mon{flex:1}
+  .mn-kpis,.mn-kpis4{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mn-kpis3{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .mn-kpis3 .kpi{padding:12px}.mn-kpis3 .kpi .v{font-size:17px}
+  .mn-kpis .kpi:nth-child(5){grid-column:1/-1;border-left:0;border-top:1px solid var(--line)}
+  .mn-kpis4 .kpi:nth-child(3){border-left:0}
+  .mn-week{gap:4px}
+  .mn-wd{min-height:60px;padding:6px 0 8px}
+  .mn-wd small{font-size:10px}
+  .mn-actions .btn{flex:1 1 auto}
+  .mn-actions .sp{display:none}
+  .mn-actions .seg{width:100%}.mn-actions .seg button{flex:1}
+  .mn-catlist{grid-template-columns:minmax(0,1fr)}
+  .mn-cd{grid-template-columns:minmax(0,1fr)}
+  .mn-sell{grid-template-columns:minmax(0,1fr);gap:16px}
+  .mn-gl .li{flex-wrap:wrap;gap:8px 12px}
+  .mn-gl .li .t{flex:1 1 calc(100% - 60px)}
+  .mn-gm{flex:1 1 55%;width:auto;min-width:0}
+  .mn-gs{flex:0 0 auto;width:auto}
+  .mn-ul .li{flex-wrap:wrap}
+  .mn-ul .li .t{flex:1 1 60%}
+  .mn-pay{flex-wrap:wrap}
+  .mn-exp.tbl-wrap{border-radius:var(--r-md)}
+  .mn-dw-big b{font-size:16px}
+  .mn-dw-act .btn{flex:1 1 auto}
+  .mn-lt th:nth-child(4),.mn-lt td:nth-child(4){display:none}
+}
+@media (max-width:420px){
+  .mn-calc{grid-template-columns:minmax(0,1fr)}
+  .mn-dr{grid-template-columns:54px minmax(0,1fr) 60px}
+  .mn-dw-big>div{padding:10px}
+}
+@media (max-width:899px){
+  .mn-page .icobtn.sm{width:40px;height:40px}
+  .mn-lk{min-height:36px;display:inline-flex;align-items:center;text-align:left}
+  .mn-pay .t>b{overflow:visible}
+  .mn-cl{min-height:40px}
+}

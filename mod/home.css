@@ -1,0 +1,103 @@
+/* HOME: дашборд «Сьогодні» + «Задачі». Префікс .hm- */
+.hm-page .hm-kpis{margin-bottom:20px}
+.hm-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:20px;align-items:start}
+.hm-col{display:flex;flex-direction:column;gap:16px;min-width:0}
+.hm-none{padding:18px;color:var(--mute);font-size:13.5px}
+.hm-none.hm-ok{display:flex;align-items:center;gap:8px;color:var(--ok)}
+.hm-sep{padding:8px 16px 6px;font-size:11px;font-weight:600;color:var(--faint);text-transform:uppercase;letter-spacing:.04em;background:var(--canvas);border-bottom:1px solid var(--line)}
+.card.flush>.li:last-child,.card.flush>.hm-att:last-child{border-bottom:0}
+.hm-ap{position:relative;padding-left:16px}
+.hm-ap::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:var(--off)}
+.hm-ap.st-new::before{background:var(--st-new-ink)}
+.hm-ap.st-confirmed::before{background:var(--st-ok-ink)}
+.hm-ap.st-arrived::before{background:var(--accent)}
+.hm-ap.st-done::before{background:var(--off)}
+.hm-ap.st-noshow::before{background:var(--danger)}
+.hm-ap.dim{opacity:.6}
+.hm-time{width:46px;flex:none}
+.hm-time b{display:block;font-weight:600;font-variant-numeric:tabular-nums}
+.hm-time small{display:block;color:var(--faint);font-size:12px;font-variant-numeric:tabular-nums}
+.hm-acts{display:flex;gap:6px;flex:none;flex-wrap:wrap;justify-content:flex-end}
+.hm-tag-a{background:var(--st-noshow);color:var(--st-noshow-ink)}
+.card-h .pill-n{margin-left:2px}
+
+/* потребує уваги */
+.hm-att{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line);min-height:60px}
+.hm-att-i{width:30px;height:30px;border-radius:50%;background:var(--soft);display:grid;place-items:center;flex:none;color:var(--ink-2)}
+.hm-att.t-dng .hm-att-i{background:var(--st-noshow);color:var(--st-noshow-ink)}
+.hm-att.t-warn .hm-att-i{background:var(--st-here);color:var(--st-here-ink)}
+.hm-att.t-ok .hm-att-i{background:var(--st-ok);color:var(--st-ok-ink)}
+.hm-att .t{flex:1;min-width:0}
+.hm-att .t b{display:block;font-weight:600;font-size:13.5px;line-height:1.3}
+.hm-att .t small{display:block;color:var(--mute);font-size:12.5px;line-height:1.35}
+
+/* тиждень */
+.hm-week-top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.hm-big{font-family:var(--font-d);font-size:24px;font-weight:600;letter-spacing:-.02em}
+.hm-wk{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;height:110px}
+.hm-wk-c{display:flex;flex-direction:column;gap:6px;min-width:0}
+.hm-wk-b{flex:1;display:flex;align-items:flex-end;justify-content:center;gap:3px;min-height:0}
+.hm-wk-b i{flex:1;max-width:18px;border-radius:3px 3px 0 0;min-height:0}
+.hm-wk-b i.p{background:var(--soft-2)}
+.hm-wk-b i.c{background:var(--ink)}
+.hm-wk-c.now .hm-wk-b i.c{background:var(--accent)}
+.hm-wk-c.fut .hm-wk-b i.p{background:var(--soft)}
+.hm-wk-c span{text-align:center;font-size:11.5px;color:var(--mute)}
+.hm-wk-c.now span{color:var(--ink);font-weight:600}
+.hm-legend{display:flex;gap:14px;margin-top:12px;font-size:12px;color:var(--mute);align-items:center;flex-wrap:wrap}
+.hm-legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px}
+.hm-legend i.c{background:var(--ink)} .hm-legend i.p{background:var(--soft-2)}
+
+/* нотатка дня */
+.hm-note-t{margin:0;white-space:pre-wrap;line-height:1.5}
+
+/* майстер */
+.hm-nm{font-family:var(--font-d);font-size:19px;font-weight:600;letter-spacing:-.01em}
+.hm-nt{font-size:13px;font-weight:600;color:var(--ink);text-transform:none;letter-spacing:0}
+.hm-mini{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;font-size:13px;color:var(--mute)}
+.hm-mini b{color:var(--ink);font-weight:600}
+.hm-tot{background:var(--canvas)}
+
+/* задачі */
+.hm-addbar{display:flex;gap:10px;align-items:center;margin-bottom:20px}
+.hm-sec{margin-bottom:22px}
+.hm-sec>h3{margin:0 0 8px;font-size:12px;font-weight:600;color:var(--mute);letter-spacing:.03em;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+.hm-sec>h3.dng-t{color:var(--danger)}
+.hm-tasks{border:1px solid var(--line);border-radius:var(--r-lg);background:var(--bg);overflow:hidden}
+.hm-tasks.in{border:0;border-radius:0}
+.hm-task{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--line);min-height:56px}
+.hm-task:last-child{border-bottom:0}
+.hm-task:hover{background:#FAFAFB}
+.hm-chk{width:34px;height:34px;margin:-6px;display:grid;place-items:center;flex:none;color:#fff;position:relative}
+.hm-chk::before{content:"";position:absolute;left:50%;top:50%;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;border:1.5px solid var(--line-strong);background:var(--bg);transition:background .12s,border-color .12s}
+.hm-chk .i{position:relative}
+.hm-chk:hover::before{border-color:var(--ink)}
+.hm-task.done .hm-chk::before{background:var(--ink);border-color:var(--ink)}
+.hm-task.done .hm-task-t b{text-decoration:line-through;color:var(--faint);font-weight:500}
+.hm-task-t{flex:1;min-width:0}
+.hm-task-t b{display:block;font-weight:500;line-height:1.35}
+.hm-task-t small{display:flex;align-items:center;gap:10px;color:var(--mute);font-size:12.5px;flex-wrap:wrap;margin-top:2px}
+.hm-task-t small>span{display:inline-flex;align-items:center;gap:4px}
+.hm-prio{width:7px;height:7px;border-radius:50%;background:var(--off)}
+.hm-prio.p-high{background:var(--danger)} .hm-prio.p-mid{background:var(--warn)}
+.hm-lnk{display:inline-flex;align-items:center;gap:4px;color:var(--accent);font-weight:500;cursor:pointer}
+.hm-lnk:hover{text-decoration:underline}
+.hm-clchip{display:flex;align-items:center;gap:10px;padding:6px 6px 6px 10px;border:1px solid var(--line-strong);border-radius:var(--r-sm)}
+.hm-clchip b{flex:1;min-width:0;font-weight:600}
+
+@media (max-width:1100px){.hm-grid{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:899px){
+  .hm-ap{flex-wrap:wrap;row-gap:8px}
+  .hm-ap .hm-acts{width:100%;justify-content:flex-start;padding-left:58px}
+  .hm-ap .hm-acts .btn{flex:1}
+  .hm-att{flex-wrap:wrap;row-gap:8px}
+  .hm-att .hm-acts{width:100%;padding-left:42px;justify-content:flex-start}
+  .hm-att .hm-acts .btn{flex:1}
+  .hm-chk{width:40px;height:40px;margin:-9px}
+  .card-h .link{display:inline-flex;align-items:center;min-height:36px}
+  .hm-task .icobtn.sm{width:40px;height:40px}
+  .hm-addbar{flex-wrap:wrap}
+  .hm-wk{height:96px;gap:5px}
+}
+
+@media(max-width:899px){.hm-week h3 .hm-rep{display:inline-flex;align-items:center;min-height:40px;padding:0 4px;margin:-10px 0}}

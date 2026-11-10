@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex,nofollow">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<title>Slotly — адмінка салону</title>
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="app.css">
+<!-- MODULE CSS -->
+<link rel="stylesheet" href="mod/home.css">
+<link rel="stylesheet" href="mod/calendar.css">
+<link rel="stylesheet" href="mod/clients.css">
+<link rel="stylesheet" href="mod/money.css">
+<link rel="stylesheet" href="mod/salon.css">
+<link rel="stylesheet" href="mod/system.css">
+</head>
+<body>
+<div class="app">
+  <aside class="side" aria-label="Навігація">
+    <a class="logo" href="#/home"><i></i>Slotly<small>демо</small></a>
+    <button class="salon-sw" id="salon-sw" data-act="salon"></button>
+    <nav class="nav" id="nav"></nav>
+    <button class="me" id="me" data-act="me"></button>
+  </aside>
+  <main class="main">
+    <div id="banners"></div>
+    <header class="top">
+      <button class="icobtn ghost m-only" data-act="salon" aria-label="Салон" style="margin-left:-6px;font-weight:700;font-size:12px">SB</button>
+      <h1 id="ttl"></h1>
+      <div class="top-actions">
+        <div id="top-x" class="row"></div>
+        <button class="gsearch" data-act="search"><svg class="i"><use href="#i-search"/></svg><span>Пошук</span><kbd>Ctrl K</kbd></button>
+        <button class="icobtn m-only" data-act="search" aria-label="Пошук"><svg class="i"><use href="#i-search"/></svg></button>
+      </div>
+    </header>
+    <div class="view" id="view"></div>
+  </main>
+</div>
+<nav class="tabbar" id="tabbar" aria-label="Основні розділи"></nav>
+<script>/* збирач помилок для check.py */window.__errs=[];window.addEventListener('error',function(e){__errs.push((e.message||'')+' @'+(e.filename||'').split('/').pop()+':'+e.lineno)});(function(){var ce=console.error;console.error=function(){__errs.push([].map.call(arguments,function(x){return x&&x.stack||String(x)}).join(' ').slice(0,300));ce.apply(console,arguments)}})();</script>
+<script src="js/core.js"></script>
+<!-- MODULES: кожен реєструє App.route(...) -->
+<script src="mod/home.js"></script>
+<script src="mod/calendar.js"></script>
+<script src="mod/clients.js"></script>
+<script src="mod/money.js"></script>
+<script src="mod/salon.js"></script>
+<script src="mod/system.js"></script>
+<script>App.boot()</script>
+</body>
+</html>
