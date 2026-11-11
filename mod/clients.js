@@ -135,7 +135,7 @@ function drawList(root){
   SEGS.forEach(function(s){counts[s[0]]=0});counts.all=base.length;
   base.forEach(function(r){SEGS.forEach(function(s){if(s[0]!=='all'&&segOK(r,s[0]))counts[s[0]]++});if(segOK(r,'lostreg'))counts.lostreg++});
   var rows=sortRows(base.filter(function(r){return segOK(r,S.seg)}));
-  var ch=SEGS.map(function(s){return '<button class="chip" data-a="seg" data-v="'+s[0]+'" aria-pressed="'+(S.seg===s[0])+'">'+s[1]+' <span class="cnt">'+counts[s[0]]+'</span></button>'}).join('');
+  var ch=SEGS.filter(function(s){return full||s[0]!=='bday'}).map(function(s){return '<button class="chip" data-a="seg" data-v="'+s[0]+'" aria-pressed="'+(S.seg===s[0])+'">'+s[1]+' <span class="cnt">'+counts[s[0]]+'</span></button>'}).join('');
   if(S.seg==='lostreg')ch+='<button class="chip" data-a="seg" data-v="lostreg" aria-pressed="true">Ходили регулярно, давно не були <span class="cnt">'+counts.lostreg+'</span></button>';
   root.querySelector('#cl-chips').innerHTML=ch;
   S.sel.forEach(function(id){if(!App.client(id))S.sel.delete(id)});
@@ -156,7 +156,7 @@ function drawList(root){
 function drawHelp(root){var full=isFull(),rs=allRows(),lr=rs.filter(function(r){return segOK(r,'lostreg')}),bd=rs.filter(function(r){return segOK(r,'bday')}),dups=full?findDups():[];
   var h='';
   if(lr.length)h+='<div class="cl-hc"><div class="cl-hct"><b>Давно не були</b><span>'+plu(lr.length,'клієнт','клієнти','клієнтів')+', які ходили регулярно (2+ візити, 60+ днів без візиту)</span></div><div class="cl-hca"><button class="btn sm" data-a="lostreg">Показати</button><button class="btn sm ghost" data-a="lostcopy">'+I('copy')+'Телефони</button></div></div>';
-  if(bd.length)h+='<div class="cl-hc"><div class="cl-hct"><b>Іменинники тижня</b><span>'+bd.slice().sort(function(a,b){return a.bd-b.bd}).slice(0,2).map(function(r){return esc(U.short(r.c.n))+' · '+(r.bd===0?'сьогодні':r.bd===1?'завтра':'через '+r.bd+' дн.')}).join(', ')+(bd.length>2?' і ще '+(bd.length-2):'')+'</span></div><div class="cl-hca"><button class="btn sm" data-a="bday">Показати</button></div></div>';
+  if(bd.length&&full)h+='<div class="cl-hc"><div class="cl-hct"><b>Іменинники тижня</b><span>'+bd.slice().sort(function(a,b){return a.bd-b.bd}).slice(0,2).map(function(r){return esc(U.short(r.c.n))+' · '+(r.bd===0?'сьогодні':r.bd===1?'завтра':'через '+r.bd+' дн.')}).join(', ')+(bd.length>2?' і ще '+(bd.length-2):'')+'</span></div><div class="cl-hca"><button class="btn sm" data-a="bday">Показати</button></div></div>';
   if(dups.length)h+='<div class="cl-hc"><div class="cl-hct"><b>Можливі дублікати</b><span>'+plu(dups.length,'група','групи','груп')+' з однаковим телефоном чи схожим імʼям</span></div><div class="cl-hca"><a class="btn sm" href="#/clients-dups">Переглянути</a></div></div>';
   root.querySelector('#cl-help').innerHTML=h}
 
@@ -169,7 +169,7 @@ function renderList(v,params,q){
   var usedSrc={};App.db.clients.forEach(function(c){if(c.src)usedSrc[c.src]=1});
   var sortKey=['last','spent','visits','name'].indexOf(S.sort)>=0?S.sort:'last';
   v.innerHTML='<div class="page wide cl-page" id="cl-root"><div class="cl-help" id="cl-help"></div>'+
-   '<div class="cl-bar"><div class="inp-ic cl-search">'+I('search')+'<input class="inp" id="cl-q" type="search" placeholder="Пошук за імʼям чи телефоном" value="'+esc(S.q)+'" autocomplete="off" aria-label="Пошук клієнтів"></div>'+
+   '<div class="cl-bar"><div class="inp-ic cl-search">'+I('search')+'<input class="inp" id="cl-q" type="search" placeholder="Імʼя або телефон" value="'+esc(S.q)+'" autocomplete="off" aria-label="Пошук клієнтів"></div>'+
    '<button class="btn cl-fbtn" data-a="ftoggle" aria-label="Фільтри">'+I('filter')+'<span>Фільтри</span><i id="cl-fn" class="pill-n"></i></button></div>'+
    '<div class="cl-filters'+(S.fopen?' open':'')+'" id="cl-filters">'+
      (full?'<select class="sel" id="cl-fm" aria-label="Майстер"><option value="">Усі майстри</option>'+App.masters(true).map(function(m){return '<option value="'+m.id+'"'+(S.m===m.id?' selected':'')+'>'+esc(m.short)+'</option>'}).join('')+'</select>':'')+

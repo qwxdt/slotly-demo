@@ -324,7 +324,7 @@ function gaps(staffId,date,as){var wh=App.workHours(staffId,date);if(!wh)return 
   return out.map(function(g){return [Math.max(g[0],now>g[0]&&now<g[1]?Math.ceil(now/15)*15:g[0]),g[1]]}).filter(function(g){return g[1]-g[0]>=30&&g[1]>now})}
 function dashMaster(v,q){
   var T0=T(),me=App.me(),day=(q&&q.d)||T0,now=D.nowMin(),acc=App.db.settings.access||{};
-  var canPay=App.can('checkout')||acc.masterPay;
+  var canPay=App.can('checkout')||!!acc.masterPay;
   var as=App.apptsOn(day,me.id).filter(function(a){return a.status!=='cancelled'&&!a.block}).sort(function(a,b){return a.start-b.start});
   var pr=App.payroll(me.id,day,day);
   var wh=App.workHours(me.id,day),off=App.timeOff&&App.timeOff(me.id,day);
@@ -344,18 +344,27 @@ function dashMaster(v,q){
     else if(c&&c.note&&!al)notes.push('<div class="note">'+ic('note')+'<span>'+esc(c.note)+'</span></div>');
     if(cur.note)notes.push('<div class="note">'+ic('msg')+'<span>'+esc(cur.note)+'</span></div>');
     if(notes.length)h+='<div class="col-f hm-cur-n">'+notes.join('')+'</div>';
-    if(st&&!st.visits)h+='<div class="hm-mini"><span><b>Новий клієнт</b> — перший візит</span></div>';
-    else if(st)h+='<div class="hm-mini"><span><b>'+st.visits+'</b> '+U.plural(st.visits,'візит','візити','візитів')+'</span><span>середній чек <b class="num">'+U.uah(st.avg)+'</b></span><span>останній '+(st.lastDate?D.rel(st.lastDate):'—')+'</span></div>';
+    /* майстру між клієнтами — тільки «новий/постійний», без середнього чеку */
+    if(st&&!st.visits)h+='<div class="hm-mini"><span class="hm-new">Новий клієнт · перший візит</span></div>';
+    else if(st)h+='<div class="hm-mini"><span>'+st.visits+' '+U.plural(st.visits,'візит','візити','візитів')+(st.lastDate?' · останній '+D.rel(st.lastDate):'')+'</span></div>';
     var b='';
-    if(cur.status==='new'||cur.status==='confirmed')b='<button class="btn pri" data-hm="arrive" data-id="'+cur.id+'">Клієнт прийшов</button>';
-    else if(cur.status==='arrived'&&canPay)b='<button class="btn pri" data-hm="pay" data-id="'+cur.id+'">Оплата</button>';
-    h+='<div class="hm-cur-b">'+b+(ph?'<a class="btn" href="tel:'+esc(c.ph)+'">'+ic('phone')+'Подзвонити</a>':'')+'<button class="btn" data-hm="open" data-id="'+cur.id+'">Відкрити</button></div></div>';
-    return h}
+    if(cur.status==='new'||cur.status==='confirmed')b='<button class="btn pri big" data-hm="arrive" data-id="'+cur.id+'">'+ic('check')+'Прийшов</button>';
+    else if(cur.status==='arrived'&&canPay)b='<button class="btn pri big" data-hm="pay" data-id="'+cur.id+'">'+ic('wallet')+'Оплата · '+U.uah(Math.max(0,App.apptDue?App.apptDue(cur):App.apptTotal(cur)))+'</button>';
+    h+='<div class="hm-cur-b">'+b+'<button class="btn big" data-hm="open" data-id="'+cur.id+'">Відкрити</button>'+(ph?'<a class="icobtn hm-call" href="tel:'+esc(c.ph)+'" aria-label="Подзвонити">'+ic('phone')+'</a>':'')+'</div>';
+    /* «Далі» — щоб наступний був видно без скролу */
+    var nx=as.filter(function(a){return a.id!==cur.id&&a.start>=cur.start&&(a.status==='new'||a.status==='confirmed')})[0];
+    if(nx)h+='<div class="hm-next" role="button" tabindex="0" data-open="'+nx.id+'"><span class="mute">Далі</span><b class="num">'+U.hm(nx.start)+'</b><span class="ell">'+esc(cname(nx))+' · '+esc(App.apptTitle(nx))+'</span>'+ic('right','s')+'</div>';
+    return h+'</div>'}
   function line(){
-    var rows=[];as.forEach(function(a){if(cur&&a.id===cur.id)return;rows.push({t:a.start,h:apRow(a,{noStaff:true,pay:canPay})})});
-    gp.forEach(function(g){rows.push({t:g[0],h:'<button class="li hm-gap" data-hm="slot" data-d="'+day+'" data-s="'+g[0]+'"><div class="hm-time num"><b>'+U.hm(g[0])+'</b><small>'+U.hm(g[1])+'</small></div><div class="t"><b>вільно '+U.dur(g[1]-g[0])+'</b></div><span class="hm-gap-a">'+ic('plus','s')+'записати</span></button>'})});
+    var rows=[],past=[],nx1=as.filter(function(a){return !(cur&&a.id===cur.id)&&(a.status==='new'||a.status==='confirmed')&&(day!==T0||App.apptEnd(a)>now)})[0];
+    /* AUDIT-master: велика кнопка лише в найближчої, у боргу чи «прийшов»; решта рядків — спокійні (менше шуму) */
+    as.forEach(function(a){if(cur&&a.id===cur.id)return;var need=a===nx1||a.status==='arrived'||(App.apptDue&&App.apptDue(a)>0&&a.status==='done');var r={t:a.start,h:apRow(a,{noStaff:true,pay:canPay,act:need?undefined:false})};
+      if(day===T0&&(a.status==='done'||a.status==='noshow')&&App.apptEnd(a)<=now&&!(App.apptDue&&App.apptDue(a)>0))past.push(r);else rows.push(r)});
+    gp.forEach(function(g){if(day===T0&&g[1]<=now)return;rows.push({t:g[0],h:'<button class="li hm-gap" data-hm="slot" data-d="'+day+'" data-s="'+g[0]+'"><div class="hm-time num"><b>'+U.hm(g[0])+'</b><small>'+U.hm(g[1])+'</small></div><div class="t"><b>вільно '+U.dur(g[1]-g[0])+'</b></div><span class="hm-gap-a">'+ic('plus','s')+'записати</span></button>'})});
     rows.sort(function(a,b){return a.t-b.t});
-    var h='<div class="card flush"><div class="card-h"><b>'+(day===T0?'Сьогодні':'Записи')+'</b>'+(as.length?'<span class="pill-n">'+as.length+'</span>':'')+'<span class="sp"></span>'+(wh?'<span class="mute">зміна '+U.hm(wh.start)+'–'+U.hm(wh.end)+'</span>':'')+'</div>';
+    var h='<div class="card flush"><div class="card-h"><b>'+(day===T0?'Сьогодні':'Записи')+'</b>'+(as.length?'<span class="pill-n">'+as.length+'</span>':'')+'<span class="sp"></span>'+(wh?'<span class="mute">'+U.hm(wh.start)+'–'+U.hm(wh.end)+'</span>':'')+'</div>';
+    if(past.length)h+='<details class="hm-past"><summary>'+ic('check','s')+'Завершено: '+past.length+'</summary>'+past.map(function(r){return r.h}).join('')+'</details>';
+    if(!rows.length&&past.length)return h+'<div class="hm-empty sm"><b>На сьогодні все</b><span>Більше записів немає.</span></div></div>';
     if(!rows.length)return h+'<div class="hm-empty">'+ic('cal','l')+'<b>'+(off?'Вихідний: '+esc(off.note||'відпустка'):wh?'Записів немає':'Цей день не робочий')+'</b><span>'+(wh?'Увесь день вільний.':'Графік змінює адміністратор.')+'</span></div></div>';
     return h+rows.map(function(r){return r.h}).join('')+'</div>'}
   var rel=D.diff(T0,day);
@@ -363,8 +372,8 @@ function dashMaster(v,q){
   v.innerHTML='<div class="page narrow hm-page hm-myday">'+
    '<div class="hm-dnav"><button class="icobtn" data-hm="mday" data-d="'+D.add(day,-1)+'" aria-label="Попередній день">'+ic('left')+'</button><div class="hm-dnav-t"><b>'+(rel===0?'Сьогодні':rel===1?'Завтра':rel===-1?'Вчора':D.human(day,{wd:true}).split(',')[0])+'</b><span>'+D.human(day,{wd:true})+'</span></div><button class="icobtn" data-hm="mday" data-d="'+D.add(day,1)+'" aria-label="Наступний день">'+ic('right')+'</button></div>'+
    (day!==T0?'<button class="btn ghost sm hm-today" data-hm="mday" data-d="'+T0+'">До сьогодні</button>':'')+
-   '<div class="kpis hm-kpis hm-k2">'+kpi('Записів / вільно',as.length+NB+'/'+NB+hrs(freeMin),wh?'зміна '+U.hm(wh.start)+'–'+U.hm(wh.end):'не робочий день')+
-    kpi('Зароблено',U.uah(pr.total),pr.tips?'з них чайові '+U.uah(pr.tips):'ставка '+(pr.pct||0)+'%')+'</div>'+
+   '<div class="kpis hm-kpis hm-k2">'+kpi('Записів · вільно',as.length+NB+'·'+NB+hrs(freeMin),wh?'':'не робочий день')+
+    '<a class="hm-kpi-a" href="#/payroll">'+kpi('Зароблено',U.uah(pr.total),pr.tips?'чайові '+U.uah(pr.tips):'')+'</a></div>'+
    curCard()+line()+(day===T0?tasksCard():'')+'</div>';
   v.onclick=function(e){hmClick(e)};
   var pg=v.querySelector('.hm-myday'),x0=null,y0=0;

@@ -26,7 +26,7 @@ function svcName(id){var s=App.svc(id);return s?s.n:id}
 function mastersAll(){return App.masters()}
 function hmp(m){return U.hm(m).padStart(5,'0')}
 function canAll(){return App.can('calendar.all')}
-function canPay(){return App.can('checkout')}
+function canPay(a){if(App.can('checkout'))return true;var acc=(App.db.settings&&App.db.settings.access)||{};return !!(acc.masterPay&&a&&a.staff===App.db.meId)}
 function depositPaid(a){return U.sum(App.apptPays(a).filter(function(p){return p.kind==='deposit'}),function(p){return p.amount})}
 function paidSvc(a){return U.sum(App.apptPays(a).filter(function(p){return p.kind==='service'||p.kind==='cert'||p.kind==='abon'||p.kind==='refund'}),function(p){return p.amount})}
 function apptsReal(date,sid){return App.apptsOn(date,sid).filter(function(a){return !isBlock(a)})}
@@ -522,6 +522,7 @@ function weekHtml(){
 
 /* ───────── СПИСОК ───────── */
 function listRange(){
+  if(!canAll())return [S.d,D.add(S.d,6)]; /* майстер: свої записи на 7 днів від обраної дати, без перемикача */
   if(S.r==='week'){var a=D.weekStart(S.d);return [a,D.add(a,6)]}
   if(S.r==='month')return [D.monthStart(S.d),D.monthEnd(S.d)];
   return [S.d,S.d];
@@ -541,23 +542,24 @@ function listData(){
 function listHtml(){
   var arr=listData(),h='';
   var rg=listRange();
-  h+='<div class="cal-lf">'+
-    '<div class="seg">'+[['day','День'],['week','Тиждень'],['month','Місяць']].map(function(x){return '<button data-act="cal-lr" data-r="'+x[0]+'" aria-pressed="'+(S.r===x[0])+'">'+x[1]+'</button>'}).join('')+'</div>'+
+  var all=canAll();
+  h+='<div class="cal-lf'+(all?'':' mine')+'">'+
+    (all?'<div class="seg">'+[['day','День'],['week','Тиждень'],['month','Місяць']].map(function(x){return '<button data-act="cal-lr" data-r="'+x[0]+'" aria-pressed="'+(S.r===x[0])+'">'+x[1]+'</button>'}).join('')+'</div>':'')+
     '<div class="inp-ic cal-lq">'+I('search')+'<input class="inp" placeholder="Клієнт, послуга, телефон" value="'+esc(S.qq)+'" data-cal-q></div>'+
-    '<select class="sel" data-cal-st aria-label="Статус"><option value="">Усі статуси</option>'+Object.keys(App.ST).map(function(k){return '<option value="'+k+'"'+(S.st===k?' selected':'')+'>'+App.ST[k].n+'</option>'}).join('')+'<option value="block"'+(S.st==='block'?' selected':'')+'>Блоки часу</option></select>'+
+    (all?'<select class="sel" data-cal-st aria-label="Статус"><option value="">Усі статуси</option>'+Object.keys(App.ST).map(function(k){return '<option value="'+k+'"'+(S.st===k?' selected':'')+'>'+App.ST[k].n+'</option>'}).join('')+'<option value="block"'+(S.st==='block'?' selected':'')+'>Блоки часу</option></select>'+
     (canAll()?'<select class="sel" data-cal-m aria-label="Майстер"><option value="">Усі майстри</option>'+visibleMasters().map(function(m){return '<option value="'+m.id+'"'+(S.m===m.id?' selected':'')+'>'+esc(m.short)+'</option>'}).join('')+'</select>':'')+
     '<select class="sel" data-cal-src aria-label="Джерело"><option value="">Усі джерела</option>'+Object.keys(App.SRC).map(function(k){return '<option value="'+k+'"'+(S.src===k?' selected':'')+'>'+App.SRC[k]+'</option>'}).join('')+'</select>'+
-    '<button class="chip" data-act="cal-lunp" aria-pressed="'+S.unpaid+'">Не оплачені</button></div>';
+    '<button class="chip" data-act="cal-lunp" aria-pressed="'+S.unpaid+'">Не оплачені</button>':'')+'</div>';
   var sel=Object.keys(S.sel).filter(function(id){return S.sel[id]&&arr.find(function(a){return a.id===id})});
   var newCount=arr.filter(function(a){return a.status==='new'}).length;
   h+='<div class="cal-lbar"><span class="mute">'+arr.length+' '+U.plural(arr.length,'запис','записи','записів')+(arr.length?' · '+U.uah(U.sum(arr.filter(function(a){return App.active(a)&&a.status!=='noshow'&&!isBlock(a)}),App.apptTotal)):'')+'</span><span class="sp"></span>'+
-    (sel.length?'<span class="cal-bulk">Обрано '+sel.length+'<button class="btn sm pri" data-act="cal-bulk" data-st="confirmed">Підтвердити</button><button class="btn sm" data-act="cal-bulk-clear">Зняти вибір</button></span>':
+    (!all?'':sel.length?'<span class="cal-bulk">Обрано '+sel.length+'<button class="btn sm pri" data-act="cal-bulk" data-st="confirmed">Підтвердити</button><button class="btn sm" data-act="cal-bulk-clear">Зняти вибір</button></span>':
       (newCount?'<button class="btn sm" data-act="cal-bulk-new">Обрати непідтверджені ('+newCount+')</button>':''))+
-    '<button class="btn sm" data-act="cal-export">'+I('download','s')+'CSV</button></div>';
+    (all?'<button class="btn sm" data-act="cal-export">'+I('download','s')+'CSV</button>':'')+'</div>';
   if(!arr.length){
     var filt=S.qq||S.st||S.src||S.unpaid||(canAll()&&S.m);
     if(filt)return h+UI.empty('search','Нічого не знайдено','За цими фільтрами записів немає.','<button class="btn" data-act="cal-lreset" style="margin-top:8px">Скинути фільтри</button>');
-    return h+UI.empty('cal',S.r==='month'?'У цьому місяці записів немає':S.r==='week'?'На цьому тижні записів немає':'Записів за цей день немає','Додайте запис або поділіться посиланням на онлайн-запис.','<div class="row" style="margin-top:8px;justify-content:center"><button class="btn" data-act="cal-copylink">Копіювати посилання</button><button class="btn pri" data-act="cal-new">Новий запис</button></div>');
+    return h+UI.empty('cal',!canAll()?'На найближчі 7 днів записів немає':S.r==='month'?'У цьому місяці записів немає':S.r==='week'?'На цьому тижні записів немає':'Записів за цей день немає','Додайте запис або поділіться посиланням на онлайн-запис.','<div class="row" style="margin-top:8px;justify-content:center"><button class="btn" data-act="cal-copylink">Копіювати посилання</button><button class="btn pri" data-act="cal-new">Новий запис</button></div>');
   }
   var rows='',lastD='',shown=arr.slice(0,S.lim);
   var multi=rg[0]!==rg[1];
@@ -565,7 +567,7 @@ function listHtml(){
     if(multi&&a.date!==lastD){lastD=a.date;rows+='<tr class="cal-dsep"><td colspan="9"><b>'+esc(dShort(a.date))+'</b> <span class="mute">'+esc(D.rel(a.date))+'</span></td></tr>'}
     var c=cl(a.client),m=App.staff(a.staff),tot=isBlock(a)?0:App.apptTotal(a),paid=paidSvc(a);
     var payTxt=isBlock(a)?'':a.status==='cancelled'||a.status==='noshow'?'<span class="faint">—</span>':a.status==='done'?(App.apptDue(a)>0?'<span class="warn-t">борг '+U.uah(App.apptDue(a))+'</span>':'<span class="ok-t">Оплачено</span>'):(a.deposit>0&&depositPaid(a)>0?'передопл. '+U.uah(depositPaid(a)):'<span class="faint">—</span>');
-    rows+='<tr class="click" data-id="'+a.id+'"><td class="cal-c-chk"><label class="check" data-nopen><input type="checkbox" data-cal-chk="'+a.id+'"'+(S.sel[a.id]?' checked':'')+'></label></td>'+
+    rows+='<tr class="click" data-id="'+a.id+'">'+(all?'<td class="cal-c-chk"><label class="check" data-nopen><input type="checkbox" data-cal-chk="'+a.id+'"'+(S.sel[a.id]?' checked':'')+'></label></td>':'')+
       '<td class="cal-c-tm num"><b>'+hmp(a.start)+'</b><small>'+(multi?'':'–'+hmp(App.apptEnd(a)))+'</small></td>'+
       '<td class="cal-c-cl">'+(isBlock(a)?'<span class="av sm">'+I('lock','s')+'</span>':UI.av(c||{n:'?',id:'x'},'sm'))+'<span class="t"><b class="ell">'+esc(cname(a))+'</b><small class="ell">'+(c&&c.ph&&App.canSeePhone()?esc(App.phoneOf(c)):isBlock(a)?'Блок часу':'')+'</small></span></td>'+
       '<td class="cal-c-sv"><span class="ell">'+esc(isBlock(a)?(a.note||'—'):App.apptTitle(a)||'—')+'</span></td>'+
@@ -575,7 +577,7 @@ function listHtml(){
       '<td class="cal-c-sum r num">'+(isBlock(a)?'':U.uah(tot))+'</td>'+
       '<td class="cal-c-pay r">'+payTxt+'</td></tr>';
   });
-  h+='<div class="tbl-wrap cards cal-tw"><table class="tbl"><thead><tr><th style="width:36px"><label class="check" data-nopen><input type="checkbox" data-cal-chkall></label></th><th>Час</th><th>Клієнт</th><th>Послуги</th><th>Майстер</th><th>Джерело</th><th>Статус</th><th class="r">Сума</th><th class="r">Оплата</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+  h+='<div class="tbl-wrap cards cal-tw'+(all?'':' mine')+'"><table class="tbl"><thead><tr>'+(all?'<th style="width:36px"><label class="check" data-nopen><input type="checkbox" data-cal-chkall></label></th>':'')+'<th>Час</th><th>Клієнт</th><th>Послуги</th><th>Майстер</th><th>Джерело</th><th>Статус</th><th class="r">Сума</th><th class="r">Оплата</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
   if(arr.length>shown.length)h+='<div class="cal-more"><button class="btn" data-act="cal-more">Показати ще ('+(arr.length-shown.length)+')</button></div>';
   return '<div class="cal-listpage">'+h+'</div>';
 }
@@ -1298,10 +1300,10 @@ App.newAppt=function(o){
 
 function blockForm(root,init){
   var st={staff:init.staff&&init.staff!=='any'?init.staff:(S.m||(visibleMasters()[0]||{}).id),date:init.date,start:init.start!=null?init.start:Math.max(540,Math.ceil(D.nowMin()/15)*15),dur:init.dur||60,label:init.label?(BLOCK_LABELS.indexOf(init.label)>=0?init.label:'Інше'):'Перерва',custom:init.label&&BLOCK_LABELS.indexOf(init.label)<0?init.label:''};
-  var ms=visibleMasters();
+  var ms=visibleMasters();if(ms.length===1)st.staff=ms[0].id;
   function draw(){
     root.innerHTML='<div class="cal-bf only-when"><div class="cal-bf-r" style="grid-column:1/-1"><div class="note">'+I('info')+'<span>Блок закриває час майстра для записів: перерва, особисті справи, навчання. У виторг і статистику клієнтів не входить.</span></div>'+
-      '<div class="grid2 m1" style="margin-top:12px"><label class="fld"><span>Майстер</span><select class="sel" data-f="staff">'+ms.map(function(m){return '<option value="'+m.id+'"'+(st.staff===m.id?' selected':'')+'>'+esc(m.short)+'</option>'}).join('')+'</select></label>'+
+      '<div class="grid2 m1" style="margin-top:12px">'+(ms.length>1?'<label class="fld"><span>Майстер</span><select class="sel" data-f="staff">'+ms.map(function(m){return '<option value="'+m.id+'"'+(st.staff===m.id?' selected':'')+'>'+esc(m.short)+'</option>'}).join('')+'</select></label>':'')+
       '<label class="fld"><span>Дата</span><input class="inp" type="date" data-f="date" value="'+st.date+'"></label>'+
       '<label class="fld"><span>Початок</span><input class="inp" type="time" data-f="start" value="'+hmp(st.start)+'" step="'+(stepMin()*60)+'"></label>'+
       '<label class="fld"><span>Тривалість, хв</span><input class="inp" type="number" min="5" step="5" data-f="dur" value="'+st.dur+'"></label></div>'+
@@ -1475,25 +1477,25 @@ App.openAppt=function(id){
         (c.blocked?'<div class="note dng">'+I('ban')+'<span>Клієнт у чорному списку.</span></div>':'')+
         (c.tags.indexOf('allergy')>=0||c.note?'<div class="note warn">'+I('alert')+'<span>'+(c.tags.indexOf('allergy')>=0?'<b>Алергія. </b>':'')+esc(c.note||'')+'</span></div>':'')+'</div>';
     }else h+='<div class="cal-d-cl"><div class="cal-cc"><span class="av">?</span><span class="t"><b>Без імені</b><small>Швидкий запис</small></span><button class="btn sm" data-d="setclient">Обрати клієнта</button></div></div>';
+    /* нотатка — одразу під клієнтом: алергії/побажання майстер має бачити першими */
+    h+='<section class="cal-d-s cal-d-ns"><h4>Нотатка <button class="link" data-d="note">'+(a.note?'Змінити':'Додати')+'</button></h4>'+(a.note?'<div class="cal-d-note'+(/алерг|протипоказ|вагітн/i.test(a.note)?' warn':'')+'">'+(/алерг|протипоказ|вагітн/i.test(a.note)?I('alert','s'):'')+esc(a.note)+'</div>':'<div class="mute" style="font-size:13px">Немає нотаток</div>')+'</section>';
     /* послуги */
     h+='<section class="cal-d-s"><h4>Послуги</h4><div class="cal-d-svc">'+a.items.map(function(x){var s=App.svc(x.svc);return '<div class="r"><span class="ell">'+esc(s?s.n:x.svc)+'<small>'+U.dur(x.d)+'</small></span><b>'+U.uah(x.price)+'</b></div>'}).join('')+
       (disc?'<div class="r mute"><span>Знижка'+(a.discount.type==='pct'?' '+a.discount.v+'%':'')+'</span><b>−'+U.uah(disc)+'</b></div>':'')+
       '<div class="r tot"><span>Разом</span><b>'+U.uah(total)+'</b></div></div></section>';
     /* коли / хто */
-    h+='<section class="cal-d-s"><h4>Деталі</h4><dl class="dl cal-dl"><dt>Майстер</dt><dd>'+(m?UI.av(m,'xs')+' '+esc(m.n):'—')+'</dd><dt>Дата</dt><dd>'+esc(D.human(a.date,{wd:true,year:true}))+'</dd><dt>Час</dt><dd>'+hmp(a.start)+'–'+hmp(App.apptEnd(a))+' · '+U.dur(App.apptDur(a))+'</dd>'+
+    h+='<section class="cal-d-s"><h4>Деталі</h4><dl class="dl cal-dl">'+(m&&m.id===App.db.meId&&App.me().role==='master'?'':'<dt>Майстер</dt><dd>'+(m?UI.av(m,'xs')+' '+esc(m.n):'—')+'</dd>')+'<dt>Дата</dt><dd>'+esc(D.human(a.date,{wd:true,year:true}))+'</dd><dt>Час</dt><dd>'+hmp(a.start)+'–'+hmp(App.apptEnd(a))+' · '+U.dur(App.apptDur(a))+'</dd>'+
       '<dt>Джерело</dt><dd>'+esc(App.SRC[a.src]||a.src)+'</dd>'+
-      (a.deposit>0||dep>0?'<dt>Передоплата</dt><dd>'+(dep>0?'<span class="ok-t">'+U.uah(dep)+' внесено</span>':'<span class="warn-t">'+U.uah(a.deposit)+' очікується</span>'+(canPay()?' <button class="link" data-d="dep">Внести</button>':''))+'</dd>':'')+
+      (a.deposit>0||dep>0?'<dt>Передоплата</dt><dd>'+(dep>0?'<span class="ok-t">'+U.uah(dep)+' внесено</span>':'<span class="warn-t">'+U.uah(a.deposit)+' очікується</span>'+(canPay(a)?' <button class="link" data-d="dep">Внести</button>':''))+'</dd>':'')+
       (a.status==='done'||paid?'<dt>Оплачено</dt><dd>'+U.uah(paid)+(due>0?' · <span class="warn-t">борг '+U.uah(due)+'</span>':'')+'</dd>':'')+
       (App.apptTips(a)?'<dt>Чайові</dt><dd>'+U.uah(App.apptTips(a))+'</dd>':'')+
       '<dt>Створено</dt><dd>'+esc(fmtTs(a.created))+'</dd></dl></section>';
-    /* нотатка */
-    h+='<section class="cal-d-s"><h4>Нотатка <button class="link" data-d="note">'+(a.note?'Змінити':'Додати')+'</button></h4>'+(a.note?'<div class="cal-d-note">'+esc(a.note)+'</div>':'<div class="mute" style="font-size:13px">Немає нотаток</div>')+'</section>';
     /* оплати */
     var pr=pays.filter(function(p){return p.kind!=='cert_sale'&&p.kind!=='abon_sale'});
     if(pr.length){
       var KIND={service:'Оплата',deposit:'Передоплата',tip:'Чайові',product:'Товар',cert:'Сертифікат',abon:'Абонемент',refund:'Повернення'};
       h+='<section class="cal-d-s"><h4>Платежі</h4><div class="cal-d-pay">'+pr.map(function(p){return '<div class="r"><span>'+I(App.payMethod(p.method).ic||'coins','s')+'<span>'+esc(KIND[p.kind]||p.kind)+' · '+esc(App.payMethod(p.method).n||p.method)+'<small>'+esc(fmtTs(p.ts))+(p.note?' · '+esc(p.note):'')+'</small></span></span><b class="'+(p.amount<0?'dng-t':'')+'">'+U.uah(p.amount)+'</b>'+
-        (canPay()&&p.amount>0&&(p.kind==='service'||p.kind==='deposit'||p.kind==='product'||p.kind==='tip')?'<button class="link" data-d="refund" data-p="'+p.id+'">Повернути</button>':'')+'</div>'}).join('')+'</div></section>';
+        (App.can("checkout")&&p.amount>0&&(p.kind==='service'||p.kind==='deposit'||p.kind==='product'||p.kind==='tip')?'<button class="link" data-d="refund" data-p="'+p.id+'">Повернути</button>':'')+'</div>'}).join('')+'</div></section>';
     }
     /* дії */
     var acts=[];
@@ -1516,8 +1518,8 @@ App.openAppt=function(id){
     var more='<button class="icobtn cal-dmore" data-d="more" aria-label="Інші дії" title="Перенести, скасувати, повторити…">'+I('more')+'</button>';
     if(a.status==='new')f='<button class="btn pri big" data-d="st" data-s="confirmed">'+I('check')+'Підтвердити</button>';
     else if(a.status==='confirmed')f='<button class="btn pri big" data-d="st" data-s="arrived">'+I('check')+'Прийшов(ла)</button>';
-    else if(a.status==='arrived')f=canPay()?'<button class="btn pri big" data-d="pay">'+I('wallet')+'Оплата · '+U.uah(Math.max(0,total-paid))+'</button>':'<span class="mute">Оплату приймає адміністратор</span>';
-    else if(a.status==='done')f=(due>0&&canPay()?'<button class="btn pri big" data-d="pay">Доплатити '+U.uah(due)+'</button>':'<button class="btn pri big" data-d="repeat">'+I('repeat')+'Записати знову</button>');
+    else if(a.status==='arrived')f=canPay(a)?'<button class="btn pri big" data-d="pay">'+I('wallet')+'Оплата · '+U.uah(Math.max(0,total-paid))+'</button>':'<span class="mute">Оплату приймає адміністратор</span>';
+    else if(a.status==='done')f=(due>0&&canPay(a)?'<button class="btn pri big" data-d="pay">Доплатити '+U.uah(due)+'</button>':'<button class="btn pri big" data-d="repeat">'+I('repeat')+'Записати знову</button>');
     else if(a.status==='noshow')f='<span class="mute">Клієнт не прийшов</span>';
     else f='<span class="mute">Запис скасовано</span>';
     foot.innerHTML=more+f;
@@ -1705,7 +1707,7 @@ function certOk(g){return g&&g.status!=='used'&&g.balance>0&&(!g.expires||g.expi
 App.checkout=function(id){
   var a=App.appt(id);if(!a)return UI.toast('Запис не знайдено',{type:'err'});
   if(isBlock(a))return;
-  if(!canPay())return UI.toast('Оплату приймає адміністратор',{type:'err'});
+  if(!canPay(a))return UI.toast('Оплату приймає адміністратор',{type:'err'});
   if(a.status==='cancelled'||a.status==='noshow')return UI.toast('Запис скасовано або клієнт не прийшов — спочатку відновіть його',{type:'err'});
   if(a.status==='done'&&App.apptDue(a)<=0)return showReceipt(id);
   UI.closeAll();
@@ -1736,6 +1738,9 @@ App.checkout=function(id){
       /* ── ліва частина ── */
       function drawLeft(){
         var h='<section><div class="cal-h">Послуги</div>'+st.items.map(function(x,i){var s=App.svc(x.svc);return '<div class="cal-sr co"><div class="n"><b class="ell">'+esc(s?s.n:x.svc)+'</b><small>'+U.dur(x.d)+'</small></div><label class="inp-suf"><input type="number" min="0" step="10" inputmode="numeric" data-price="'+i+'" value="'+x.price+'" aria-label="Ціна"><span>₴</span></label></div>'}).join('')+'</section>';
+        /* AUDIT-master: на телефоні рідкісне (знижка/товар/сертифікат) згорнуто, щоб чайові й «Оплатити» були ближче */
+        var mob=isMob(),mo=mob&&(st.more||st.dv||st.cert||st.abon||Object.keys(st.prods).length);
+        if(mob)h+='<details class="cal-co-more" data-more'+(mo?' open':'')+'><summary>'+I('plus','s')+'<span>Знижка, товар, сертифікат</span>'+(st.dv||st.cert||st.abon||Object.keys(st.prods).length?'<span class="badge plain">є</span>':'')+'</summary>';
         h+='<section><div class="cal-h">Знижка</div><div class="cal-disc"><div class="seg"><button data-dt="pct" aria-pressed="'+(st.dtype==='pct')+'">%</button><button data-dt="sum" aria-pressed="'+(st.dtype==='sum')+'">₴</button></div>'+
           '<label class="inp-suf"><input type="number" min="0" step="'+(st.dtype==='pct'?5:10)+'" inputmode="numeric" data-dv value="'+(st.dv||'')+'" placeholder="0"><span>'+(st.dtype==='pct'?'%':'₴')+'</span></label>'+
           '<div class="chips">'+[5,10,15].map(function(p){return '<button class="chip" data-dq="'+p+'">'+p+'%</button>'}).join('')+'<button class="chip" data-dq="0">Без знижки</button></div></div></section>';
@@ -1768,7 +1773,9 @@ App.checkout=function(id){
           }
           h+='</section>';
         }
+        if(mob)h+='</details>';
         L.innerHTML=h;
+        var dm=L.querySelector('[data-more]');if(dm)dm.addEventListener('toggle',function(){st.more=dm.open});
       }
       /* ── права частина: підсумок + методи ── */
       function drawRight(){

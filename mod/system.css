@@ -367,3 +367,6 @@
   .sy-olinks .btn{height:44px}
 }
 @media (max-width:899px){.sy-sec .sy-lk{display:inline-flex;align-items:center;min-height:44px}}
+
+/* 320: «Свій період» вилазив за екран — сегмент на всю ширину, кнопки стискаються */
+@media (max-width:359px){.sy-bar .seg{width:100%;overflow:visible}.sy-bar .seg button{flex:1 1 auto;min-width:0;padding:0 6px;font-size:13px;white-space:nowrap}}

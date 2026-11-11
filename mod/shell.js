@@ -142,7 +142,7 @@ var KIND={'appt.new':['plus','Записи'],'appt.move':['move','Записи']
 function ago(ts){if(!ts)return '';var d=ts.slice(0,10),m=U.pm(ts.slice(11,16)||'00:00');var n=D.diff(d,T());
   if(n===0){var x=D.nowMin()-m;if(x<1)return 'щойно';if(x<60)return x+' хв';return Math.floor(x/60)+' год'}
   if(n===1)return 'вчора';return D.shortH(d)}
-function mine(){var me=App.db.meId;return (App.db.notifs||[]).filter(function(n){return n.to==='all'||n.to===me})}
+function mine(){return (App.db.notifs||[]).filter(function(n){return App.notifMine(n)})}
 function openRef(ref){if(!ref)return;var p=ref.split(':');
   if(p[0]==='appt'&&App.appt(p[1]))return App.openAppt(p[1]);
   if(p[0]==='client'&&App.client(p[1]))return App.openClient(p[1]);
@@ -150,7 +150,7 @@ function openRef(ref){if(!ref)return;var p=ref.split(':');
 function notifRows(tab){var L=mine().filter(function(n){return tab==='all'||(KIND[n.kind]||['','Записи'])[1]===tab});
   if(!L.length)return '<div class="sh-nempty">'+ic('bell','xl')+'<b>Нових сповіщень немає</b><span>Тут зʼявляться онлайн-записи, переноси, скасування й гроші.</span></div>';
   return L.map(function(n){var k=KIND[n.kind]||['info'];return '<button class="sh-n'+(n.read?'':' un')+'" data-n="'+n.id+'"><span class="sh-nic">'+ic(k[0])+'</span><span class="sh-nt">'+esc(n.txt)+'</span><span class="sh-ntm">'+ago(n.ts)+'</span></button>'}).join('')}
-function notifTabs(cur){return '<div class="seg sh-ntabs" role="tablist">'+[['all','Усі'],['Записи','Записи'],['Гроші','Гроші']].map(function(t){return '<button role="tab" data-tab="'+t[0]+'" aria-selected="'+(t[0]===cur)+'">'+t[1]+'</button>'}).join('')+'</div>'}
+function notifTabs(cur){return '<div class="seg sh-ntabs" role="tablist">'+[['all','Усі'],['Записи','Записи'],['Гроші','Гроші']].filter(function(t){return t[0]!=='Гроші'||App.me().role!=='master'}).map(function(t){return '<button role="tab" data-tab="'+t[0]+'" aria-selected="'+(t[0]===cur)+'">'+t[1]+'</button>'}).join('')+'</div>'}
 function bindNotif(root,redraw){
   root.addEventListener('click',function(e){var b=e.target.closest('[data-n]');if(b){var n=(App.db.notifs||[]).find(function(x){return x.id===b.dataset.n});if(n){O.readNotifs([n.id]);closePop();openRef(n.ref);App.refresh&&setTimeout(function(){var d=U.$('#bell .dot');if(d)d.hidden=!App.unread().length},0)}return}
     var t=e.target.closest('[data-tab]');if(t){redraw(t.dataset.tab);return}

@@ -523,16 +523,27 @@ App.dayStatus=function(date){var db=App.db,now=D.nowMin(),T=App.today();var as=A
     open:as.filter(function(a){return (a.status==='new'||a.status==='confirmed')&&past(a)}).map(function(a){return a.id}),
     noshow:as.filter(function(a){return a.status==='noshow'}).map(function(a){return a.id}),
     expected:App.cashBalance(date),closed:!!db.dayClose[date],revenue:m.revenue,avg:m.avgCheck,tips:m.tips,byMethod:m.byMethod}};
-App.unread=function(staffId){staffId=staffId||App.db.meId;return (App.db.notifs||[]).filter(function(n){return !n.read&&(n.to==='all'||n.to===staffId)})};
+/* сповіщення «для мене»: майстру з загальних (to:'all') — тільки свої записи/клієнти й відгуки, без грошей салону і складу */
+App.notifMine=function(n,staffId){staffId=staffId||App.db.meId;if(n.to===staffId)return true;if(n.to!=='all')return false;
+  var me=App.staff(staffId);if(!me||me.role!=='master')return true;if(/^(pay|day|stock)$/.test(n.kind||''))return false;
+  var r=(n.ref||'').split(':');if(r[0]==='appt'){var a=App.appt(r[1]);return !!(a&&a.staff===staffId)}return r[0]!=='cash'&&r[0]!=='products'};
+App.unread=function(staffId){staffId=staffId||App.db.meId;return (App.db.notifs||[]).filter(function(n){return !n.read&&App.notifMine(n,staffId)})};
 
 /* ───────── фінанси: розрахунки ───────── */
 /* виторг за період: послуги (оплачені), продажі товарів, продаж сертифікатів/абонементів, чайові окремо */
 App.money=function(from,to,staffId){
   var db=App.db,acc=db.settings.accounting;
-  var pays=db.payments.filter(function(p){return p.date>=from&&p.date<=to&&(!staffId||p.staff===staffId)});
-  var o={services:0,products:0,certSales:0,abonSales:0,tips:0,deposits:0,refunds:0,byMethod:{},cash:0,count:0,certRedeemed:0,abonRedeemed:0};
+  /* передоплата = аванс: у касі — в день оплати, у виторзі — в день візиту і лише коли візит уже відбувся/закрився (не new/confirmed/arrived) */
+  var inR=function(d){return d>=from&&d<=to};
+  var depDay=function(p){var a=App.appt(p.appt);if(!a)return p.date;return a.status==='new'||a.status==='confirmed'||a.status==='arrived'?null:a.date};
+  var o={services:0,products:0,certSales:0,abonSales:0,tips:0,deposits:0,depositsAhead:0,refunds:0,byMethod:{},cash:0,count:0,certRedeemed:0,abonRedeemed:0};
+  db.payments.forEach(function(p){if(p.kind!=='deposit'||(staffId&&p.staff!==staffId))return;var d=depDay(p);
+    if(d&&inR(d)){o.services+=p.amount;o.deposits+=p.amount}
+    if(!d&&inR(p.date))o.depositsAhead+=p.amount});
+  var pays=db.payments.filter(function(p){return inR(p.date)&&(!staffId||p.staff===staffId)});
   pays.forEach(function(p){
-    if(p.kind==='service'||p.kind==='deposit'){o.services+=p.amount;if(p.kind==='deposit')o.deposits+=p.amount}
+    if(p.kind==='service'){o.services+=p.amount}
+    else if(p.kind==='deposit'){}
     else if(p.kind==='cert'){o.certRedeemed+=p.amount;if(acc.certRevenue==='redeem')o.services+=p.amount}
     else if(p.kind==='abon'){o.abonRedeemed+=p.amount;}
     else if(p.kind==='product')o.products+=p.amount;
@@ -761,7 +772,8 @@ App.cur=null;
 App.render=function(){
   var r=App.parse(),rt=ROUTES[r.id]||ROUTES.home;if(!rt)return;
   if(r.q.as&&App.staff(r.q.as)&&App.db.meId!==r.q.as){App.db.meId=r.q.as;App.save(true)}
-  if(rt.perm&&!App.can(rt.perm)&&!(rt.permAlt&&App.can(rt.permAlt))){rt=ROUTES.denied||rt}
+  var selfOk=r.id==='team'&&r.params[0]&&r.params[0]===App.db.meId; /* майстер відкриває свій профіль/графік */
+  if(rt.perm&&!selfOk&&!App.can(rt.perm)&&!(rt.permAlt&&App.can(rt.permAlt))){rt=ROUTES.denied||rt}
   App.cur={rt:rt,r:r};
   renderShell(rt,r);
   var view=U.$('#view');view.scrollTop=App._keepScroll===rt.id?view.scrollTop:0;App._keepScroll=null;
@@ -782,18 +794,18 @@ function canRoute(x){return x&&(!x.perm||App.can(x.perm)||(x.permAlt&&App.can(x.
 function navItems(){return Object.keys(ROUTES).map(function(k){return ROUTES[k]}).filter(function(r){return r.nav&&App.NAV_HIDE.indexOf(r.id)<0&&canRoute(r)}).sort(function(a,b){return (a.order||99)-(b.order||99)})}
 /* вкладки таббару за роллю (DESIGN-V2 §6.1); null = центральна «+» */
 App.tabsFor=function(role){
-  if(role==='master')return [['home','home','Мій день'],['calendar','cal','Календар'],null,['payroll','coins','Заробіток'],['more','menu','Ще']];
+  if(role==='master')return [['home','home','Мій день'],['calendar','cal','Календар'],null,['clients','users','Клієнти'],['more','menu','Ще']];
   if(role==='accountant')return [['home','home','Сьогодні'],['cash','wallet','Каса'],['reports','chart','Звіти'],['more','menu','Ще']];
   return [['home','home','Сьогодні'],['calendar','cal','Календар'],null,['clients','users','Клієнти'],['more','menu','Ще']]};
 App.canNew=function(rt){var me=App.me(),acc=App.db.settings.access||{};if(rt&&(rt.noNew||App.TOP_NEW_HIDE.indexOf(rt.id)>=0||App.TOP_NEW_HIDE.indexOf(rt.parent)>=0))return false;
   if(!(App.can('calendar.all')||App.can('calendar.own')))return false;if(me.role==='master'&&acc.masterBook===false)return false;return true};
-var MASTER_LBL={home:'Мій день',payroll:'Мій заробіток'};
+var MASTER_LBL={home:'Мій день',team:'Мій профіль',payroll:'Мій заробіток',schedules:'Мій графік'};App.MASTER_LBL=MASTER_LBL;
 function navLink(it,rt){var c=it.count?it.count():'',lb=(App.me().role==='master'&&MASTER_LBL[it.id])||it.title;return '<a href="#/'+it.id+'" '+(it.id===rt.id||(rt.parent===it.id)?'aria-current="page"':'')+'>'+App.icon(it.icon)+'<span>'+lb+'</span>'+(c?'<span class="cnt'+(it.countDot?' dot':'')+'">'+c+'</span>':'')+'</a>'}
 function bannerFor(db,me){var L=[];
   if(db.settings.offline)L.push('<div class="banner off" role="status">'+App.icon('wifioff')+'<span><b>Немає інтернету.</b> Записи зберігаються на пристрої й синхронізуються, щойно зʼявиться звʼязок.</span><span class="sp"></span><button class="btn sm" data-act="online">Звʼязок є</button></div>');
   if(db.settings.alert.on)L.push('<div class="banner air" role="status">'+App.icon('siren')+'<span><b>Повітряна тривога · '+U.esc(db.settings.alert.region)+'.</b> '+(db.settings.alert.mode==='pause'?'Онлайн-запис на найближчу годину призупинено.':'Клієнтам надіслано повідомлення про можливу затримку.')+'</span><span class="sp"></span><button class="btn sm" data-act="alert-off">Відбій</button></div>');
   var y=D.add(App.today(),-1);
-  if(['owner','admin','accountant'].indexOf(me.role)>=0&&!db.dayClose[y]&&App.apptsOn(y).some(function(a){return a.status==='done'}))L.push('<div class="banner warn" role="status">'+App.icon('alert')+'<span><b>Вчора не закрито день.</b> Звірте касу, щоб зарплати й звіти були точні.</span><span class="sp"></span><a class="btn sm" href="#/cash/close">Закрити день</a></div>');
+  if(['owner','admin','accountant'].indexOf(me.role)>=0&&!db.dayClose[y]&&App.apptsOn(y).some(function(a){return a.status==='done'}))L.push('<div class="banner warn" role="status">'+App.icon('alert')+'<span class="bn-t"><b>Вчора не закрито день<span class="bn-full">.</span></b><span class="bn-full"> Звірте касу, щоб зарплати й звіти були точні.</span></span><span class="sp"></span><a class="btn sm" href="#/cash/close">Закрити день</a></div>');
   if(!L.length)return '';return L[0].replace('</div>',(L.length>1?'<span class="banner-more">ще '+(L.length-1)+'</span>':'')+'</div>')}
 function renderShell(rt,r){
   var db=App.db,me=App.me(),items=navItems(),side='',sys='';
@@ -825,8 +837,8 @@ App.navItems=navItems;App.GROUPS=GROUPS;
 var _shT;App.on('change',function(){clearTimeout(_shT);_shT=setTimeout(function(){if(App.cur)try{renderShell(App.cur.rt,App.cur.r)}catch(e){console.error(e)}},0)});
 
 /* «Ще» (мобільний) */
-App.route('more',{title:'Ще',render:function(v){var inTab=App.tabsFor(App.me().role).filter(Boolean).map(function(t){return t[0]});var items=navItems().filter(function(x){return inTab.indexOf(x.id)<0});var h='<div class="page"><div class="list" style="margin-bottom:16px"><button class="li" data-act="me">'+UI.av(App.me())+'<span class="t"><b>'+U.esc(App.me().n)+'</b><small>'+App.ROLES[App.me().role].n+' · '+U.esc(App.db.salon.name)+'</small></span>'+App.icon('right','s')+'</button></div>';
-  GROUPS.forEach(function(g){var its=items.filter(function(x){return (x.group||'work')===g[0]});if(!its.length)return;h+=(g[1]?'<div class="more-grp">'+g[1]+'</div>':'')+'<div class="list" style="margin-bottom:16px">'+its.map(function(it){return '<a class="li" href="#/'+it.id+'" style="text-decoration:none">'+App.icon(it.icon,'l')+'<span class="t"><b>'+it.title+'</b></span>'+App.icon('right','s')+'</a>'}).join('')+'</div>'});
+App.route('more',{title:'Ще',render:function(v){var inTab=App.tabsFor(App.me().role).filter(Boolean).map(function(t){return t[0]});var items=navItems().filter(function(x){return inTab.indexOf(x.id)<0});var h='<div class="page"><div class="list" style="margin-bottom:16px"><button class="li" data-act="me">'+UI.av(App.me())+'<span class="t"><b>'+U.esc(App.me().n)+'</b><small>'+App.ROLES[App.me().role].n+' · '+U.esc(App.db.salon.name)+'</small></span>'+App.icon('right','s')+'</button><a class="li" href="#/notifications" style="text-decoration:none">'+App.icon('bell','l')+'<span class="t"><b>Сповіщення</b></span>'+App.icon('right','s')+'</a></div>';
+  GROUPS.forEach(function(g){var its=items.filter(function(x){return (x.group||'work')===g[0]});if(!its.length)return;h+=(g[1]?'<div class="more-grp">'+g[1]+'</div>':'')+'<div class="list" style="margin-bottom:16px">'+its.map(function(it){return '<a class="li" href="#/'+it.id+'" style="text-decoration:none">'+App.icon(it.icon,'l')+'<span class="t"><b>'+((App.me().role==='master'&&MASTER_LBL[it.id])||it.title)+'</b></span>'+App.icon('right','s')+'</a>'}).join('')+'</div>'});
   v.innerHTML=h+'</div>'}});
 App.route('denied',{title:'Немає доступу',render:function(v){v.innerHTML='<div class="page">'+UI.empty('lock','Цей розділ недоступний для вашої ролі','Попросіть власника салону відкрити доступ у Налаштування → Ролі.','<a class="btn" href="#/home" style="margin-top:8px">На головну</a>')+'</div>'}});
 

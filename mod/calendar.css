@@ -269,6 +269,9 @@ button.cal-wc:hover{border-color:var(--ink);}
   .cal-lq .inp{height:44px}
   .cal-wk{min-width:0}
   .cal-tw tr{grid-template-areas:"cl st" "sv sum" "tm pay"}
+  /* майстер: час — головне, ставимо першим рядком картки */
+  .cal-tw.mine tr{grid-template-areas:"tm st" "cl sum" "sv pay"}
+  .cal-tw.mine td.cal-c-tm{color:var(--ink);font-weight:600}
   .cal-tw td.cal-c-chk,.cal-tw td.cal-c-m,.cal-tw td.cal-c-src{display:none}
   .cal-tw td.cal-c-cl{grid-area:cl;height:auto;min-width:0}.cal-tw td.cal-c-st{grid-area:st;text-align:right}
   .cal-tw td.cal-c-sv{grid-area:sv;max-width:none}.cal-tw td.cal-c-sum{grid-area:sum}
@@ -515,4 +518,30 @@ button.cal-wc:hover{border-color:var(--ink);}
 @media (max-width:359px){
   .wl-acts .btn{flex:1 1 100%}.wl-acts .sp{display:none}
   .cal-movebar{flex-wrap:wrap}.cal-movebar .btn{flex:1 1 100%}
+}
+/* AUDIT-master: нотатка над послугами; попередження помітне; підпис тривалості ліворуч */
+.cal-d-svc .r>span,.cal-d-pay .r>span{text-align:left}
+.cal-d-note.warn{background:var(--warn-soft);color:var(--ink);display:flex;gap:8px;align-items:flex-start}
+.cal-d-note.warn svg{flex:none;margin-top:2px;color:var(--warn)}
+@media (max-width:899px){
+  .cal-d-svc .r,.cal-d-pay .r{font-size:15px;padding:10px 0}
+  .cal-d-svc small,.cal-d-pay small{font-size:13px}
+  .cal-d-note{font-size:15px;padding:12px 14px}
+  .cal-dl{font-size:14px}
+}
+/* AUDIT-master: оплата на телефоні — крупніше, рідкісне згорнуто */
+.cal-co-more{border:1px solid var(--line);border-radius:var(--r-md);padding:0 12px}
+.cal-co-more>summary{display:flex;align-items:center;gap:8px;min-height:48px;list-style:none;cursor:pointer;font-weight:500;color:var(--ink-2,var(--ink))}
+.cal-co-more>summary::-webkit-details-marker{display:none}
+.cal-co-more[open]{padding-bottom:12px}.cal-co-more[open]>section+section{margin-top:16px}
+@media (max-width:899px){
+  .cal-h{font-size:13px}
+  .cal-h small{font-size:13px}
+  .cal-pn2{font-size:15px}
+  .cal-co .inp,.cal-co input,.cal-co select{font-size:16px}
+  .cal-co-r{gap:16px}
+  .cal-foot-sum{font-size:14px}
+  .cal-co .chip{height:40px;font-size:14px}
+  .cal-co .cal-sr .n b{font-size:15px}.cal-co .cal-sr .n small{font-size:13px}
+  .cal-co .cal-sr .inp-suf{height:44px}.cal-co .cal-sr .inp-suf input{font-size:16px}
 }

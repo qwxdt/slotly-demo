@@ -398,14 +398,17 @@ function renderStaffPage(v,id,q){
   var isM=s.role==='master',payOk=App.can('payroll.view')||App.can('payroll.*')||(App.me().id===s.id&&App.can('payroll.own'));
   var tabs=[['profile','Профіль'],['services','Послуги'],['schedule','Графік'],['pay','Оплата'],['access','Доступ'],['stats','Статистика']].filter(function(t){
     if(t[0]==='services'||t[0]==='stats')return isM;if(t[0]==='schedule')return !!s.week||isM;if(t[0]==='pay')return payOk&&(isM||s.pay);return true});
-  var tab=q.tab&&tabs.some(function(t){return t[0]===q.tab})?q.tab:'profile';
+  var self=App.me().id===s.id&&!App.can('team.view');
+  if(self){tabs=tabs.filter(function(t){return t[0]!=='access'});var ord={schedule:0,services:1,stats:2,pay:3,profile:4};tabs.sort(function(a,b){return ord[a[0]]-ord[b[0]]})}
+  var defTab=self&&tabs.some(function(t){return t[0]==='schedule'})?'schedule':'profile';
+  var tab=q.tab&&tabs.some(function(t){return t[0]===q.tab})?q.tab:defTab;
   var st=todayStatus(s);
-  var h='<a class="sl-back" href="#/team">'+ic('left','s')+'Команда</a>'+
+  var h=(self?'<a class="sl-back" href="#/more">'+ic('left','s')+'Ще</a>':'<a class="sl-back" href="#/team">'+ic('left','s')+'Команда</a>')+
    '<div class="sl-ph">'+UI.av(s,'xl')+'<div class="t"><h2>'+esc(s.n)+'</h2><div class="row wrap g12" style="margin-top:4px"><span class="badge plain">'+App.ROLES[s.role].n+'</span>'+(s.active===false?'<span class="badge cancelled">В архіві</span>':'<span class="sl-st">'+statDot(st.k)+esc(st.t)+'</span>')+(App.level(s.lvl)?'<span class="mute">'+esc(App.level(s.lvl).n)+'</span>':'')+(s.spec?'<span class="mute">· '+esc(s.spec)+'</span>':'')+'</div></div></div>'+
    '<div class="tabs" role="tablist">'+tabs.map(function(t){return '<button role="tab" data-a="tab" data-k="'+t[0]+'" aria-selected="'+(t[0]===tab)+'">'+t[1]+'</button>'}).join('')+'</div><div data-tab></div>';
   var pg=page(v,'sl-staff narrow',h);
   App.setTop(isM&&App.can('calendar.*')?'<a class="btn" href="#/calendar?staff='+s.id+'">'+ic('cal','s')+'<span class="sl-lbl">Календар</span></a>':'');
-  act(pg,{tab:function(t){App.setQ({tab:t.dataset.k==='profile'?null:t.dataset.k},true)}});
+  act(pg,{tab:function(t){App.setQ({tab:t.dataset.k===defTab?null:t.dataset.k},true)}});
   var box=$('[data-tab]',pg);
   ({profile:tabProfile,services:tabServices,schedule:tabSchedule,pay:tabPay,access:tabAccess,stats:tabStats})[tab](box,s,q);
 }
