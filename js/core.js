@@ -529,17 +529,10 @@ App.unread=function(staffId){staffId=staffId||App.db.meId;return (App.db.notifs|
 /* виторг за період: послуги (оплачені), продажі товарів, продаж сертифікатів/абонементів, чайові окремо */
 App.money=function(from,to,staffId){
   var db=App.db,acc=db.settings.accounting;
-  /* передоплата = аванс: у касі — в день оплати, у виторзі — в день візиту і лише коли візит уже відбувся/закрився (не new/confirmed/arrived) */
-  var inR=function(d){return d>=from&&d<=to};
-  var depDay=function(p){var a=App.appt(p.appt);if(!a)return p.date;return a.status==='new'||a.status==='confirmed'||a.status==='arrived'?null:a.date};
-  var o={services:0,products:0,certSales:0,abonSales:0,tips:0,deposits:0,depositsAhead:0,refunds:0,byMethod:{},cash:0,count:0,certRedeemed:0,abonRedeemed:0};
-  db.payments.forEach(function(p){if(p.kind!=='deposit'||(staffId&&p.staff!==staffId))return;var d=depDay(p);
-    if(d&&inR(d)){o.services+=p.amount;o.deposits+=p.amount}
-    if(!d&&inR(p.date))o.depositsAhead+=p.amount});
-  var pays=db.payments.filter(function(p){return inR(p.date)&&(!staffId||p.staff===staffId)});
+  var pays=db.payments.filter(function(p){return p.date>=from&&p.date<=to&&(!staffId||p.staff===staffId)});
+  var o={services:0,products:0,certSales:0,abonSales:0,tips:0,deposits:0,refunds:0,byMethod:{},cash:0,count:0,certRedeemed:0,abonRedeemed:0};
   pays.forEach(function(p){
-    if(p.kind==='service'){o.services+=p.amount}
-    else if(p.kind==='deposit'){}
+    if(p.kind==='service'||p.kind==='deposit'){o.services+=p.amount;if(p.kind==='deposit')o.deposits+=p.amount}
     else if(p.kind==='cert'){o.certRedeemed+=p.amount;if(acc.certRevenue==='redeem')o.services+=p.amount}
     else if(p.kind==='abon'){o.abonRedeemed+=p.amount;}
     else if(p.kind==='product')o.products+=p.amount;
@@ -800,7 +793,7 @@ function bannerFor(db,me){var L=[];
   if(db.settings.offline)L.push('<div class="banner off" role="status">'+App.icon('wifioff')+'<span><b>Немає інтернету.</b> Записи зберігаються на пристрої й синхронізуються, щойно зʼявиться звʼязок.</span><span class="sp"></span><button class="btn sm" data-act="online">Звʼязок є</button></div>');
   if(db.settings.alert.on)L.push('<div class="banner air" role="status">'+App.icon('siren')+'<span><b>Повітряна тривога · '+U.esc(db.settings.alert.region)+'.</b> '+(db.settings.alert.mode==='pause'?'Онлайн-запис на найближчу годину призупинено.':'Клієнтам надіслано повідомлення про можливу затримку.')+'</span><span class="sp"></span><button class="btn sm" data-act="alert-off">Відбій</button></div>');
   var y=D.add(App.today(),-1);
-  if(['owner','admin','accountant'].indexOf(me.role)>=0&&!db.dayClose[y]&&App.apptsOn(y).some(function(a){return a.status==='done'}))L.push('<div class="banner warn" role="status">'+App.icon('alert')+'<span class="bn-t"><b>Вчора не закрито день<span class="bn-full">.</span></b><span class="bn-full"> Звірте касу, щоб зарплати й звіти були точні.</span></span><span class="sp"></span><a class="btn sm" href="#/cash/close">Закрити день</a></div>');
+  if(['owner','admin','accountant'].indexOf(me.role)>=0&&!db.dayClose[y]&&App.apptsOn(y).some(function(a){return a.status==='done'}))L.push('<div class="banner warn" role="status">'+App.icon('alert')+'<span><b>Вчора не закрито день.</b> Звірте касу, щоб зарплати й звіти були точні.</span><span class="sp"></span><a class="btn sm" href="#/cash/close">Закрити день</a></div>');
   if(!L.length)return '';return L[0].replace('</div>',(L.length>1?'<span class="banner-more">ще '+(L.length-1)+'</span>':'')+'</div>')}
 function renderShell(rt,r){
   var db=App.db,me=App.me(),items=navItems(),side='',sys='';
