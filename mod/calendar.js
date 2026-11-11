@@ -1849,8 +1849,9 @@ App.checkout=function(id){
       R.addEventListener('change',function(e){if(e.target.matches('[data-tipm]'))st.tipM=e.target.value});
       R.addEventListener('click',function(e){
         var b=e.target.closest('button');if(!b)return;
-        if(b.dataset.fill){st.touched=true;var rem=remaining(),cur=+st.lines[b.dataset.fill]||0;
-          if(rem>0)st.lines[b.dataset.fill]=cur+rem;else if(cur>0&&rem===0&&Object.keys(st.lines).length===1){/* вже вся сума */}else if(rem<0)st.lines[b.dataset.fill]=Math.max(0,cur+rem);
+        if(b.dataset.fill){st.touched=true;var rem=remaining(),cur=+st.lines[b.dataset.fill]||0,g=grand();
+          /* недорозподілений залишок (сплит вручну) — доливаємо на цей спосіб; інакше вся сума переходить на обраний спосіб (Картка → Готівка) */
+          if(rem>0&&alloc()>0)st.lines[b.dataset.fill]=cur+rem;else{st.lines={};if(g>0)st.lines[b.dataset.fill]=g}
           if(!st.lines[b.dataset.fill])delete st.lines[b.dataset.fill];upd()}
         else if(b.dataset.gv){st.given=+b.dataset.gv;var gi=R.querySelector('[data-given]');gi.value=st.given;upd()}
         else if(b.dataset.tp!=null){var p=+b.dataset.tp;st.tipV=p?Math.round(svcTotal()*p/100/10)*10:0;upd()}
