@@ -43,6 +43,34 @@ function askConflict(cs,ok){
   return UI.confirm({title:'Записати попри зайнятість?',text:conflictText(cs).map(esc).join('<br>'),ok:ok||'Все одно записати'});
 }
 function toastErr(t){UI.toast(t,{type:'err'})}
+/* клієнт, якого ще нема в базі: інлайн «Новий клієнт» у формі запису / листа очікування (без другої модалки) */
+function ncSplit(v){v=(v||'').trim();var m=v.match(/\+?\d[\d\s()-]{5,}\d/),ph=m?m[0].replace(/\D/g,''):'';var n=m?(v.slice(0,m.index)+' '+v.slice(m.index+m[0].length)).replace(/\s+/g,' ').trim():v;return {n:n,ph:ph}}
+function ncPending(st){if(st.client)return null;var s=st.nc||(st.cq&&st.cq.trim()?ncSplit(st.cq):null);if(!s)return null;
+  var n=(s.n||'').trim(),ph=String(s.ph||'').replace(/\D/g,'');if(ph.length===10)ph='38'+ph;return n||ph?{n:n,ph:ph}:null}
+function ncCommit(p){var dup=p.ph&&App.db.clients.find(function(x){return x.ph===p.ph});
+  if(dup){UI.toast('Клієнт з таким телефоном уже є: '+esc(dup.n)+' — записано на нього',{ms:4000});return dup.id}
+  var c=App.ops.upsertClient({n:p.n||U.phone(p.ph),ph:p.ph,bd:'',note:'',consent:{sms:true,promo:false}});UI.toast('Клієнта додано: '+esc(c.n));return c.id}
+function clientField(box,st,onPick){
+  function openNc(v){st.nc=ncSplit(v);st.cq='';draw();var f=box.querySelector(st.nc.ph&&!st.nc.n?'[data-nc=ph]':'[data-nc=n]');if(f)f.focus()}
+  function draw(){
+    if(st.nc){
+      box.innerHTML='<div class="cal-nc"><div class="cal-nc-h"><b>Новий клієнт</b><button class="link" data-ncb>'+I('search','s')+'Шукати в базі</button></div>'+
+        '<div class="grid2 m1"><label class="fld"><span>Імʼя</span><input class="inp" data-nc="n" autocomplete="off" placeholder="Напр. Оксана Бойко" value="'+esc(st.nc.n)+'"></label>'+
+        '<label class="fld"><span>Телефон <small>(необовʼязково)</small></span><input class="inp" data-nc="ph" inputmode="tel" autocomplete="off" placeholder="+380" value="'+esc(st.nc.ph)+'"></label></div>'+
+        '<small class="cal-nc-s">Додамо в базу клієнтів автоматично</small></div>';
+      $$('[data-nc]',box).forEach(function(i){i.oninput=function(){st.nc[i.dataset.nc]=i.value}});
+      box.querySelector('[data-ncb]').onclick=function(){st.cq=st.nc.n||st.nc.ph||'';st.nc=null;draw()};
+      return}
+    var q=UI.clientPicker(box,function(c){st.client=c.id;st.nc=null;st.cq='';onPick(c)});
+    var res=box.querySelector('[data-res]'),slot=document.createElement('div');slot.className='list cal-ncr';q.parentNode.parentNode.insertBefore(slot,res);
+    var orig=res.onclick;res.onclick=function(e){if(e.target.closest('[data-new]'))return openNc(q.value);return orig.call(this,e)};
+    slot.onclick=function(e){if(e.target.closest('[data-new]'))openNc(q.value)};
+    function upd(){st.cq=q.value;slot.innerHTML='';var nb=res.querySelector('[data-new]');
+      if(q.value.trim()&&nb&&res.querySelectorAll('[data-c]').length<=3)slot.appendChild(nb);slot.hidden=!slot.firstChild}
+    q.addEventListener('input',upd);if(st.cq){q.value=st.cq;q.oninput()}upd();
+  }
+  draw();
+}
 
 /* ───────── додаткові операції (за зразком App.ops) ───────── */
 App.ops.createBlock=function(o){
@@ -1052,7 +1080,8 @@ function bookingForm(root,init,cfg){
       el.innerHTML='<div class="cal-h">Клієнт</div><div class="cal-cc">'+'<span class="av">?</span><span class="t"><b>Без імені</b><small>Швидкий запис — клієнта можна додати пізніше</small></span><button class="btn sm" data-x="chg">Обрати</button></div>';
     }else{
       el.innerHTML='<div class="cal-h">Клієнт <button class="link" data-x="noname">Без імені</button></div><div data-pick></div>';
-      UI.clientPicker(el.querySelector('[data-pick]'),function(cc){st.client=cc.id;st.noName=false;rClient();rExtra();rSum()});
+      var pk=el.querySelector('[data-pick]'),pick=function(cc){st.client=cc.id;st.noName=false;rClient();rExtra();rSum()};
+      if(cfg.nc)clientField(pk,st,pick);else UI.clientPicker(pk,pick);
     }
   }
   /* — послуги — */
@@ -1164,12 +1193,12 @@ function bookingForm(root,init,cfg){
     var b=e.target.closest('[data-x]'),cat=e.target.closest('[data-cat]');
     if(cat){st.cat=cat.dataset.cat;$$('[data-cat]',root).forEach(function(c){c.setAttribute('aria-pressed',c===cat)});rList();return}
     if(!b)return;var x=b.dataset.x;
-    if(x==='chg'){st.client=null;st.noName=false;rClient()}
+    if(x==='chg'){st.client=null;st.noName=false;st.nc=null;st.cq='';rClient()}
     else if(x==='last'){var lv=st.client&&lastVisit(st.client);if(!lv)return;
       if(!cfg.noAny&&lv.staff&&App.staff(lv.staff)&&App.staff(lv.staff).works!==false)st.staff=lv.staff;
       st.items=copyItems(lv.items).map(function(it){var s=App.svc(it.svc);return s?{svc:s.id,price:App.priceFor(s,staffObj()),d:s.d}:it});
       rClient();rSel();rList();rWhen();rExtra();rSum()}
-    else if(x==='noname'){st.client=null;st.noName=true;rClient();rSum()}
+    else if(x==='noname'){st.client=null;st.noName=true;st.nc=null;st.cq='';rClient();rSum()}
     else if(x==='svcmore'){st.svcOpen=true;svcFold();var qi=root.querySelector('[data-svpick] [data-q]');if(qi)qi.focus()}
     else if(x==='add'){var s=App.svc(b.dataset.id);var was=!st.items.length;st.items.push({svc:s.id,price:App.priceFor(s,staffObj()),d:s.d});st.svcOpen=false;
       rSel();rList();rWhen();rExtra();rSum();
@@ -1215,7 +1244,7 @@ function bookingForm(root,init,cfg){
       if(!who){who=cands()[0]&&cands()[0].id}
       if(!who)return {error:'Оберіть майстра'};
       return {staff:who,date:st.date,start:st.start,items:st.items.map(function(x){return {svc:x.svc,price:+x.price||0,d:+x.d||0}}),
-        dur:Math.max(dur(),step),client:st.client||null,note:st.note.trim(),src:st.src,deposit:st.deposit||0,depPaid:st.depPaid,depMethod:st.depMethod,confirmed:st.confirmed};
+        dur:Math.max(dur(),step),client:st.client||null,nc:st.noName?null:ncPending(st),note:st.note.trim(),src:st.src,deposit:st.deposit||0,depPaid:st.depPaid,depMethod:st.depMethod,confirmed:st.confirmed};
     }
   };
 }
@@ -1234,7 +1263,7 @@ App.newAppt=function(o){
     foot:'<span class="cal-foot-sum" data-fs></span><span class="sp"></span><button class="btn" data-no>Скасувати</button><button class="btn pri" data-ok>Записати</button>',
     onMount:function(el,close){
       var pa=el.querySelector('[data-pane=appt]'),pb=el.querySelector('[data-pane=block]'),ok=el.querySelector('[data-ok]');
-      form=bookingForm(pa,init,{noAny:me.role==='master'});
+      form=bookingForm(pa,init,{noAny:me.role==='master',nc:true});
       el.querySelector('[data-no]').onclick=close;
       el.querySelectorAll('[data-t]').forEach(function(b){b.onclick=function(){
         tab=b.dataset.t;el.querySelectorAll('[data-t]').forEach(function(x){x.setAttribute('aria-pressed',x===b)});
@@ -1251,6 +1280,7 @@ App.newAppt=function(o){
         var r2=form.get();if(r2.error)return toastErr(r2.error);
         var cs2=App.conflicts(r2.staff,r2.date,r2.start,r2.dur);
         var fin=function(){
+          if(!r2.client&&r2.nc)r2.client=ncCommit(r2.nc);
           var a=App.ops.createAppt({staff:r2.staff,date:r2.date,start:r2.start,items:r2.items,client:r2.client,status:r2.confirmed?'confirmed':'new',src:r2.src,note:r2.note,deposit:r2.deposit});
           if(r2.deposit>0&&r2.depPaid)App.ops.addPayment({appt:a.id,kind:'deposit',method:r2.depMethod,amount:r2.deposit,staff:r2.staff});
           if(o.wait){if(App.ops.waitSet)App.ops.waitSet(o.wait,'booked');else App.ops.removeWaitlist(o.wait)}
@@ -1306,14 +1336,15 @@ function waitlistForm(o){
     onMount:function(el,close){
       function drawC(){var box=el.querySelector('[data-cl]');var c=st.client&&cl(st.client);
         if(c){box.innerHTML='<div class="cal-cc">'+UI.av(c)+'<span class="t"><b>'+esc(c.n)+'</b><small>'+esc(U.phone(c.ph)||'без телефону')+'</small></span><button class="btn sm" data-chg>Змінити</button></div>';box.querySelector('[data-chg]').onclick=function(){st.client=null;drawC()}}
-        else{box.innerHTML='<div class="cal-h">Клієнт</div><div data-p></div>';UI.clientPicker(box.querySelector('[data-p]'),function(cc){st.client=cc.id;drawC()})}}
+        else{box.innerHTML='<div class="cal-h">Клієнт</div><div data-p></div>';clientField(box.querySelector('[data-p]'),st,function(){drawC()})}}
       drawC();
       el.addEventListener('change',function(e){var f=e.target.dataset.f;if(f)st[f]=e.target.value});
       el.addEventListener('input',function(e){if(e.target.dataset.f==='note')st.note=e.target.value});
       el.querySelector('[data-no]').onclick=close;
       el.querySelector('[data-ok]').onclick=function(){
-        if(!st.client)return toastErr('Оберіть клієнта');
+        var pend=ncPending(st);if(!st.client&&!pend)return toastErr('Оберіть клієнта або впишіть імʼя');
         if(st.to<st.from)return toastErr('Дата «До» раніше за «З»');
+        if(!st.client)st.client=ncCommit(pend);
         App.ops.setWaitlist({id:U.uid('w'),client:st.client,svc:st.svc,staff:st.staff,from:st.from,to:st.to,note:st.note,created:App.today(),status:'wait'});
         close();UI.toast('Додано до листа очікування',{ms:3500});
       };
