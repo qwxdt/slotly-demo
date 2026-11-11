@@ -74,7 +74,7 @@ function stars(n,cls){var s='';for(var i=1;i<=5;i++)s+='<span class="sy-st'+(i<=
 function unanswered(){return App.db.reviews.filter(function(r){return !r.reply&&!r.hidden}).length}
 var SRC_R={google:'Google',tg:'Telegram',ig:'Instagram',fb:'Facebook'};
 var REPLY_T=['Дякуємо за теплий відгук! Чекаємо на вас знову.','Дякуємо, що поділилися. Нам дуже приємно!','Перепрошуємо за незручності. Зателефонуємо вам, щоб все виправити.'];
-App.route('reviews',{title:'Відгуки',icon:'star',nav:true,group:'salon',order:25,module:'reviews',perm:'reviews.view',count:unanswered,render:function(v,params,q){
+App.route('reviews',{title:'Відгуки',icon:'star',nav:true,group:'growth',order:25,module:'reviews',perm:'reviews.view',count:unanswered,render:function(v,params,q){
   var db=App.db,all=db.reviews.slice().sort(function(a,b){return a.date<b.date?1:-1});
   var vis=all.filter(function(r){return !r.hidden});
   var avg=vis.length?U.sum(vis,function(r){return r.rating})/vis.length:0;
@@ -101,7 +101,7 @@ App.route('reviews',{title:'Відгуки',icon:'star',nav:true,group:'salon',o
    '<div class="sy-filters"><div class="chips scroll">'+[['all','Усі'],['open','Без відповіді'],['done','З відповіддю'],['hidden','Приховані']].map(function(c){return '<button class="chip" aria-pressed="'+(f===c[0])+'" data-sy="f" data-f="'+c[0]+'">'+c[1]+' <span class="cnt">'+cnt[c[0]]+'</span></button>'}).join('')+'</div>'+
    '<span class="sp d-only"></span>'+sel('staff',q.staff||'',[['','Усі майстри']].concat(App.masters(true).map(function(s){return [s.id,s.short]})),'data-q="staff"')+
    sel('r',q.r||'',[['','Будь-яка оцінка'],['5','5 зірок'],['4','4 зірки'],['3','3 зірки'],['2','2 зірки'],['1','1 зірка']],'data-q="r"')+'</div>'+
-   '<div class="col-f g12" id="sy-rvl">'+(list.length?list.map(reviewCard).join(''):UI.empty('star','Відгуків немає','За цим фільтром нічого не знайдено.'))+'</div></div>';
+   '<div class="col-f g12" id="sy-rvl">'+(list.length?list.map(reviewCard).join(''):(all.length?UI.empty('star','Нічого не знайдено','За цим фільтром відгуків немає. Скиньте фільтр, щоб побачити всі.','<button class="btn" data-sy="f" data-f="all">Показати всі</button>'):UI.empty('star','Відгуків ще немає','Після візиту клієнт отримає запит на відгук — увімкніть у Повідомленнях.',App.can('settings.manage')?'<a class="btn" href="#/settings/notify">Відкрити Повідомлення</a>':'')))+'</div></div>';
   v.onchange=function(e){var s=e.target.closest('[data-q]');if(s){var o={};o[s.dataset.q]=s.value;App.setQ(o,true)}};
   v.onclick=function(e){
     var b=e.target.closest('[data-sy]');if(!b)return;var k=b.dataset.sy,id=b.dataset.id;
@@ -119,72 +119,8 @@ App.route('reviews',{title:'Відгуки',icon:'star',nav:true,group:'salon',o
       App.ops.upsert('reviews',{id:id,reply:val,repliedAt:stamp()},'Відповідь на відгук: '+cname(rv.client));App.refresh();UI.toast('Відповідь збережено')}};
 }});
 
-/* ═════════════ CMD+K ═════════════ */
-var RKEY='slotly-cmdk-recent';
-function recent(){try{return JSON.parse(localStorage.getItem(RKEY)||'[]')}catch(e){return []}}
-function pushRecent(it){var r=recent().filter(function(x){return x.k!==it.k});r.unshift({k:it.k,t:it.title,s:it.sub||'',ic:it.ic,type:it.type});try{localStorage.setItem(RKEY,JSON.stringify(r.slice(0,6)))}catch(e){}}
+/* Ctrl+K — у mod/shell.js (B1). Тут лишився тільки norm() для помічника звітів. */
 function norm(s){return String(s||'').toLowerCase().replace(/ʼ|'|’/g,"'")}
-function parseDate(q){
-  var m=q.match(/(\d{1,2})[.\/-](\d{1,2})(?:[.\/-](\d{2,4}))?/);
-  if(m&&+m[2]>=1&&+m[2]<=12&&+m[1]>=1&&+m[1]<=31){var y=m[3]?(m[3].length===2?2000+ +m[3]:+m[3]):+T().slice(0,4);return y+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[1]).padStart(2,'0')}
-  m=norm(q).match(/^(\d{1,2})\s+([а-яіїє]+)$/);if(m){var mi=D.MON.findIndex(function(x){return norm(x).indexOf(m[2].slice(0,4))===0});if(mi>=0)return +T().slice(0,4)+'-'+String(mi+1).padStart(2,'0')+'-'+String(m[1]).padStart(2,'0')}
-  return null}
-function gotoDate(date){var d=date||T();if(hasRoute('calendar'))App.go('calendar',{d:d,v:'day'});else UI.toast('Календар ще в роботі',{type:'err'})}
-function dateModal(){UI.modal({title:'Перейти на дату',size:'narrow',body:'<label class="fld"><span>Дата</span><input class="inp" type="date" id="sy-gd" value="'+T()+'"></label>',foot:'<span class="sp"></span><button class="btn" data-no>Скасувати</button><button class="btn pri" data-ok>Перейти</button>',onMount:function(el,close){el.querySelector('[data-no]').onclick=close;el.querySelector('[data-ok]').onclick=function(){var d=el.querySelector('#sy-gd').value;close();gotoDate(d||T())}}})}
-function cmdItems(qs){
-  var q=norm(qs).trim(),qd=q.replace(/\D/g,''),me=App.me(),T0=T();
-  var pages=App.navItems().map(function(r){return {type:'page',k:'page:'+r.id,ic:r.icon,title:r.title,sub:'Розділ',fn:function(){App.go(r.id)}}});
-  var acts=[];
-  if(me.role!=='accountant')acts.push({type:'act',k:'act:newappt',ic:'plus',title:'Новий запис',sub:'Дія',kw:'запис записати створити',fn:function(){App.newAppt({})}});
-  if(App.can('clients.*')||App.can('clients.view'))acts.push({type:'act',k:'act:newclient',ic:'user',title:'Новий клієнт',sub:'Дія',kw:'клієнт додати створити',fn:function(){UI.clientForm({},function(){})}});
-  if(mod('certs')&&App.can('certs.*'))acts.push({type:'act',k:'act:cert',ic:'gift',title:'Продати сертифікат',sub:'Дія',kw:'сертифікат подарунковий',fn:function(){App.sellCert({})}});
-  if(App.can('expenses.add')||App.can('expenses.*'))acts.push({type:'act',k:'act:exp',ic:'receipt',title:'Додати витрату',sub:'Дія',kw:'витрата витрати',fn:function(){App.addExpense()}});
-  if(mod('tasks')&&(App.can('tasks.*')||App.can('tasks.own')))acts.push({type:'act',k:'act:task',ic:'task',title:'Нова задача',sub:'Дія',kw:'задача',fn:function(){App.taskForm()}});
-  acts.push({type:'act',k:'act:date',ic:'cal',title:'Перейти на дату…',sub:'Дія',kw:'дата календар перейти',fn:dateModal});
-  function match(it){if(!q)return 1;var t=norm(it.title+' '+(it.kw||''));if(t.indexOf(q)===0)return 3;if((' '+t).indexOf(' '+q)>=0)return 2;if(t.indexOf(q)>=0)return 1;return 0}
-  if(!q){
-    var out0=[],rc=recent();if(rc.length)out0.push({group:'Нещодавні',list:rc.map(function(r){return {type:r.type,k:r.k,ic:r.ic,title:r.t,sub:r.s}})});
-    out0.push({group:'Дії',list:acts});out0.push({group:'Розділи',list:pages.slice(0,7)});return out0}
-  var out=[],pd=parseDate(q);
-  if(pd)out.push({group:'Дата',list:[{type:'act',k:'date:'+pd,ic:'cal',title:'Календар на '+D.human(pd,{wd:true}),sub:'Перейти на дату',fn:function(){gotoDate(pd)}}]});
-  var as=acts.map(function(x){return {x:x,s:match(x)}}).filter(function(z){return z.s}).sort(function(a,b){return b.s-a.s}).map(function(z){return z.x});if(as.length)out.push({group:'Дії',list:as});
-  if(App.can('clients.*')||App.can('clients.view')||App.can('clients.own')){
-    var own=!(App.can('clients.*')||App.can('clients.view')),ownSet=null;
-    if(own){ownSet={};App.db.appts.forEach(function(a){if(a.staff===me.id)ownSet[a.client]=1})}
-    var cs=[];App.db.clients.forEach(function(c){if(ownSet&&!ownSet[c.id])return;var n=norm(c.n),sc=0;
-      if(n.indexOf(q)===0)sc=4;else if(n.split(' ').some(function(w){return w.indexOf(q)===0}))sc=3;else if(n.indexOf(q)>=0)sc=2;else if(qd.length>=3&&c.ph&&c.ph.indexOf(qd)>=0)sc=2;
-      if(sc)cs.push({c:c,sc:sc})});
-    cs.sort(function(a,b){return b.sc-a.sc||a.c.n.localeCompare(b.c.n)});
-    if(cs.length)out.push({group:'Клієнти',list:cs.slice(0,6).map(function(x){var st=App.clientStats(x.c.id);return {type:'client',k:'client:'+x.c.id,av:x.c,title:x.c.n,sub:(x.c.ph?U.phone(x.c.ph)+' · ':'')+plan(st.visits,'візит','візити','візитів'),fn:function(){App.openClient(x.c.id)}}})});
-    var ap=App.db.appts.filter(function(a){return a.date>=T0&&a.status!=='cancelled'&&(!own||a.staff===me.id)&&a.client&&norm(cname(a.client)).indexOf(q)>=0}).sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:a.start-b.start}).slice(0,4);
-    if(ap.length)out.push({group:'Записи',list:ap.map(function(a){return {type:'appt',k:'appt:'+a.id,ic:'cal',title:cname(a.client)+' · '+D.rel(a.date)+' '+U.hm(a.start),sub:App.apptTitle(a)+' · '+sname(a.staff),fn:function(){App.openAppt(a.id)}}})})}
-  var ps=pages.filter(match);if(ps.length)out.push({group:'Розділи',list:ps});
-  return out}
-App.cmdk=function(){
-  if(U.$('.cmdk'))return;
-  return UI.modal({title:'Пошук',body:'<div class="q">'+ic('search','l')+'<input id="sy-cq" placeholder="Клієнт, телефон, розділ або дія…" autocomplete="off"><kbd>Esc</kbd></div><div class="res" id="sy-cr"></div>',
-   onMount:function(el,close){
-     el.classList.add('cmdk');el.querySelector('.modal-h').style.display='none';el.querySelector('.modal-b').style.padding='0';
-     var inp=el.querySelector('#sy-cq'),res=el.querySelector('#sy-cr'),flat=[],cur=0;
-     setTimeout(function(){inp.focus()},20);
-     function sync(){U.$$('.it',res).forEach(function(b,i){b.setAttribute('aria-selected',i===cur)})}
-     function draw(){
-       var gs=cmdItems(inp.value);flat=[];var h='';
-       gs.forEach(function(g){h+='<div class="grp">'+g.group+'</div>';g.list.forEach(function(it){var i=flat.length;flat.push(it);
-         h+='<button class="it" data-i="'+i+'" aria-selected="'+(i===cur)+'">'+(it.av?UI.av(it.av,'sm'):'<span class="sy-cic">'+ic(it.ic||'search')+'</span>')+'<span class="sy-ct"><b class="ell">'+esc(it.title)+'</b>'+(it.sub?'<small class="ell">'+esc(it.sub)+'</small>':'')+'</span></button>'})});
-       if(!flat.length)h='<div class="sy-cempty">Нічого не знайдено за «'+esc(inp.value)+'»</div>';
-       res.innerHTML=h}
-     function run(it){if(!it)return;pushRecent(it);close();
-       if(it.fn)return setTimeout(it.fn,10);
-       var p=it.k.split(':'),t=p[0],id=p.slice(1).join(':');
-       if(t==='page')App.go(id);else if(t==='client')App.openClient(id);else if(t==='appt')App.openAppt(id);
-       else{var all=[].concat.apply([],cmdItems('').map(function(g){return g.list}));var f=all.find(function(x){return x.k===it.k&&x.fn});if(f)setTimeout(f.fn,10)}}
-     function move(d){if(!flat.length)return;cur=(cur+d+flat.length)%flat.length;sync();var s=res.querySelector('[aria-selected=true]');if(s)s.scrollIntoView({block:'nearest'})}
-     inp.oninput=function(){cur=0;draw()};
-     inp.onkeydown=function(e){if(e.key==='ArrowDown'){e.preventDefault();move(1)}else if(e.key==='ArrowUp'){e.preventDefault();move(-1)}else if(e.key==='Enter'){e.preventDefault();run(flat[cur])}};
-     res.onclick=function(e){var b=e.target.closest('[data-i]');if(b)run(flat[+b.dataset.i])};
-     res.onmousemove=function(e){var b=e.target.closest('[data-i]');if(b&&+b.dataset.i!==cur){cur=+b.dataset.i;sync()}};
-     draw()}})};
 App.actions.search=function(){App.cmdk()};
 
 /* ═════════════ ЗВІТИ ═════════════ */
@@ -278,8 +214,8 @@ function tabMasters(S,Pv,P){
     return {m:m,v:ds.length,rev:rev,avg:ds.length?rev/ds.length:0,load:loadRange(S.from,S.to,m.id),rb:rebook(m.id,S.from,S.to),rt:rt,pay:pr.total-pr.tips}}).sort(function(a,b){return b.rev-a.rev});
   var mx=rows.length?rows[0].rev:1,T0=rows.reduce(function(a,r){a.v+=r.v;a.rev+=r.rev;a.pay+=r.pay;return a},{v:0,rev:0,pay:0});
   var h='<div class="card sy-rank"><h3>Виторг за майстрами</h3>'+rows.map(function(r){return '<div class="sy-rk">'+UI.av(r.m,'sm')+'<span class="ell">'+esc(r.m.short)+'</span><div class="bar-h"><i style="width:'+Math.round(r.rev/(mx||1)*100)+'%"></i></div><b>'+U.uah(r.rev)+'</b></div>'}).join('')+'</div>';
-  h+=rtable(['Майстер','Виторг','Візити','Сер. чек','Завант.','Повторні','Рейтинг','Зарплата'],rows.map(function(r){return [esc(r.m.short),U.uah(r.rev),r.v,U.uah(r.avg),r.load+'%',Math.round(r.rb)+'%',r.rt?P1(r.rt):'—',U.uah(r.pay)]}),{foot:['Разом',U.uah(T0.rev),T0.v,U.uah(T0.v?T0.rev/T0.v:0),S.load+'%','','',U.uah(T0.pay)]});
-  h+='<p class="sy-hint">«Повторні» — частка клієнтів майстра, які вже записані на наступний візит. Зарплата — нарахування за період без чайових.</p>';
+  h+=rtable(['Майстер','Виторг','Візити','Сер. чек','Завант.','% перезапису','Рейтинг','Зарплата'],rows.map(function(r){return [esc(r.m.short),U.uah(r.rev),r.v,U.uah(r.avg),r.load+'%',Math.round(r.rb)+'%',r.rt?P1(r.rt):'—',U.uah(r.pay)]}),{foot:['Разом',U.uah(T0.rev),T0.v,U.uah(T0.v?T0.rev/T0.v:0),S.load+'%','','',U.uah(T0.pay)]});
+  h+='<p class="sy-hint">«% перезапису» — частка клієнтів майстра, які вже записані на наступний візит. Зарплата — нарахування за період без чайових.</p>';
   return h}
 function tabServices(S,Pv,P){
   var cur=svcStats(S.from,S.to),pv=P.cmp?svcStats(P.pf,P.pt):null;
@@ -368,7 +304,7 @@ function aiAnswer(text,P){
   if(/виторг|дохід|оборот|заробив|гроші|продаж|виручк/.test(t)){var Sp4=stats(pf,pt);return '<p>Виторг '+pr.l+': '+b(U.uah(S.rev))+' '+delta(S.rev,Sp4.rev)+' <span class="mute">(попередній період: '+U.uah(Sp4.rev)+')</span>. Візитів: '+S.visits+', середній чек '+U.uah(S.avg)+'.</p>'}
   return '<p>Поки не розумію це питання. Я відповідаю на питання про виторг, прибуток, витрати, майстрів, послуги, неявки, нових клієнтів, завантаженість та кого повернути. Спробуйте одне з прикладів нижче.</p>'}
 
-App.route('reports',{title:'Звіти',icon:'chart',nav:true,group:'money',order:13,perm:'reports.view',permAlt:'reports.day',render:function(v,params,q){
+App.route('reports',{title:'Звіти',icon:'chart',nav:true,group:'growth',order:13,perm:'reports.view',permAlt:'reports.day',render:function(v,params,q){
   var restricted=!App.can('reports.view');
   var P=periodOf(q,restricted);if(restricted){P=periodOf({p:q.p==='yday'?'yday':'today'},true)}
   P.cmp=q.cmp!=='0';
@@ -378,8 +314,8 @@ App.route('reports',{title:'Звіти',icon:'chart',nav:true,group:'money',orde
   var ds=dataStart(),warn=P.cmp&&P.pf<ds;
   App.setTop('<button class="btn" data-sy="rep-csv">'+ic('download')+'<span class="d-only">CSV</span></button>');
   var body=tab==='masters'?tabMasters(S,Pv,P):tab==='services'?tabServices(S,Pv,P):tab==='clients'?tabClients(S,Pv,P):tab==='finance'?tabFinance(S,Pv,P):tabOverview(S,Pv,P,restricted);
-  var perSeg=restricted?[['today','Сьогодні'],['yday','Вчора']]:[['week','Тиждень'],['month','Місяць'],['quarter','Квартал'],['custom','Період']];
-  v.innerHTML='<div class="page sy-page"><div class="page-h"><div><h2>Звіти</h2><p>'+(restricted?'Підсумки дня':'Аналітика салону')+' · '+esc(P.full)+'</p></div></div>'+
+  var perSeg=restricted?[['today','Сьогодні'],['yday','Вчора']]:[['week','Тиждень'],['month','Місяць'],['quarter','Квартал'],['custom','Свій період']];
+  v.innerHTML='<div class="page sy-page sy-rep"><div class="page-h"><div><h2>Звіти</h2><p>'+(restricted?'Підсумки дня':'Аналітика салону')+' · '+esc(P.full)+'</p></div></div>'+
    '<div class="sy-bar"><div class="seg">'+perSeg.map(function(s){return '<button data-sy="per" data-p="'+s[0]+'" aria-pressed="'+(P.k===s[0])+'">'+s[1]+'</button>'}).join('')+'</div>'+
    (P.k==='custom'?'<div class="sy-custom"><input class="inp" type="date" id="sy-df" value="'+P.from+'" max="'+T()+'"><span class="mute">—</span><input class="inp" type="date" id="sy-dt" value="'+P.to+'" max="'+T()+'"></div>':'')+
    '<span class="sp"></span><label class="check sy-cmp"><input type="checkbox" id="sy-cmp"'+(P.cmp?' checked':'')+'> Порівняти з попереднім періодом</label></div>'+
@@ -418,11 +354,11 @@ function noteBox(cls,t){return '<div class="note '+(cls||'')+' sy-note">'+ic('in
 
 var WD_ORDER=[1,2,3,4,5,6,0];
 var SECTIONS=[
- {id:'profile',t:'Профіль салону',ic:'door',d:'Назва, контакти, графік роботи',r:function(){var s=App.db.salon;
+ {id:'profile',g:'salon',t:'Профіль салону',ic:'door',d:'Назва, контакти, графік роботи',r:function(){var s=App.db.salon;
    return txt('salon.name','Назва салону','Показується у шапці, чеках та повідомленнях',{max:40})+txt('salon.addr','Адреса','',{ph:'вул., будинок'})+txt('salon.city','Місто','')+txt('salon.phone','Телефон','',{ph:'+380…'})+txt('salon.tg','Telegram','',{ph:'@нік'})+txt('salon.ig','Instagram','',{ph:'нік без @'})+txt('salon.site','Сайт','')+
    row('Логотип','Дві літери у кружечку замість картинки','<div class="row g12"><span class="sy-logo">'+esc(s.logo||'')+'</span><input class="inp sy-ctl" style="width:90px;text-transform:uppercase" maxlength="2" data-set="salon.logo" data-t="str" data-l="Логотип" value="'+esc(s.logo||'')+'"></div>')+
    '<h4 class="sy-h4">Години роботи</h4><div class="sy-hours">'+WD_ORDER.map(function(d){var h=s.hours[d];return '<div class="sy-hr" data-hrs="'+d+'"><label class="check"><input type="checkbox" data-h="on"'+(h?' checked':'')+'><b>'+D.WD[d]+'</b></label><div class="sy-hrt"'+(h?'':' style="visibility:hidden"')+'><input class="inp" type="time" data-h="s" value="'+t2(h?h[0]:540)+'"><span class="mute">—</span><input class="inp" type="time" data-h="e" value="'+t2(h?h[1]:1200)+'"></div>'+(h?'':'<span class="mute sy-off">Вихідний</span>')+'</div>'}).join('')+'</div>'}},
- {id:'booking',t:'Онлайн-запис',ic:'globe',d:'Правила для записів клієнтів',r:function(){
+ {id:'booking',g:'salon',t:'Онлайн-запис',ic:'globe',d:'Правила для записів клієнтів',r:function(){
    return noteBox('','Це правила, за якими працюватиме сторінка онлайн-запису. Сама сторінка — окремий продукт Slotly; тут ви задаєте поведінку.')+
    sl('settings.booking.step','Крок сітки запису','Інтервал між слотами в календарі та онлайн-записі',[[5,'5 хв'],[10,'10 хв'],[15,'15 хв'],[20,'20 хв'],[30,'30 хв'],[60,'60 хв']],{t:'num'})+
    sl('settings.booking.minNotice','Мінімум до візиту','Запис «на зараз» заборонено ближче за цей час',[[0,'Без обмежень'],[30,'30 хв'],[60,'1 година'],[120,'2 години'],[240,'4 години'],[720,'12 годин'],[1440,'1 доба']],{t:'num'})+
@@ -432,74 +368,74 @@ var SECTIONS=[
    tgl('settings.booking.allowAny','«Будь-який майстер»','Клієнт може не обирати майстра — система підбере вільного')+
    sl('settings.booking.confirmMode','Підтвердження запису','Автоматично — запис одразу в календарі. Вручну — спочатку статус «Новий»',[['auto','Автоматично'],['manual','Вручну адміністратором']])+
    tgl('settings.booking.needPhone','Телефон обовʼязковий','Без номера запис не створиться')}},
- {id:'deposit',t:'Передоплата',ic:'safe',d:'Захист від неявок',r:function(){var on=gp('settings.deposit.on');
+ {id:'deposit',g:'salon',t:'Передоплата',ic:'safe',d:'Захист від неявок',r:function(){var on=gp('settings.deposit.on');
    return (mod('deposits')?'':noteBox('warn','Модуль «Передоплата» вимкнено в розділі «Модулі». Налаштування збережуться, але не діятимуть.'))+
    tgl('settings.deposit.on','Передоплата','Клієнт вносить частину суми, щоб запис став підтвердженим')+
    (on?sl('settings.deposit.mode','Для кого','Ризикові — клієнти з неявками або без жодного візиту й з дорогою послугою',[['all','Усі клієнти'],['new','Тільки нові клієнти'],['risky','Тільки ризикові']])+
    num('settings.deposit.pct','Розмір передоплати','Відсоток від вартості записаних послуг','%',{min:5,max:100})+
    num('settings.deposit.minPrice','Від суми візиту','Для дешевших візитів передоплату не просимо','₴',{min:0})+
    num('settings.deposit.refundHours','Повернення передоплати','Якщо клієнт скасував не пізніше ніж за N годин — передоплата повертається','год',{min:0,max:168}):'')}},
- {id:'reminders',t:'Нагадування',ic:'bell',d:'Повідомлення клієнтам',r:function(){
-   var ch=gp('settings.reminders.channel'),n=App.db.appts.filter(function(a){return a.date>=T()&&a.date<=D.add(T(),29)&&a.status!=='cancelled'}).length,r=gp('settings.reminders');
-   var per=(r.h24?1:0)+(r.h2?1:0)+(r.afterVisit?1:0),msgs=n*per;
-   return tgl('settings.reminders.h24','За 24 години до візиту','Клієнт може підтвердити або скасувати запис одним дотиком')+tgl('settings.reminders.h2','За 2 години до візиту','Коротке нагадування з адресою')+tgl('settings.reminders.afterVisit','Після візиту','Подяка та прохання залишити відгук')+
-   num('settings.reminders.returnDays','Повернення клієнта','Нагадати, якщо клієнт не записався через N днів після візиту. 0 — вимкнено','днів',{min:0,max:365})+
-   sl('settings.reminders.channel','Канал','',[['tg','Telegram'],['viber','Viber'],['sms','SMS']])+
-   noteBox(ch==='sms'?'warn':'',ch==='sms'?'SMS платні: ≈ 1,3 ₴ за повідомлення. За найближчі 30 днів це приблизно <b>'+U.fmt(msgs)+'</b> повідомлень — ≈ <b>'+U.uah(Math.round(msgs*1.3))+'</b>.':'Telegram та Viber безкоштовні. Клієнти без месенджера отримають SMS (≈ 1,3 ₴) — лише якщо дали на це згоду.')}},
- {id:'noshow',t:'Неявки',ic:'ban',d:'Автоматичні відмітки та блокування',r:function(){
+ {id:'notify',g:'msg',t:'Повідомлення',ic:'bell',d:'Нагадування, шаблони, канали',r:function(){return notifyHtml()}},
+ {id:'telegram',g:'msg',t:'Telegram',ic:'tg',d:'Бот для клієнтів і команди',r:function(){return tgHtml()}},
+ {id:'forms',g:'msg',t:'Анкети',ic:'note',d:'Питання перед першим візитом',r:function(){return formsHtml()}},
+ {id:'noshow',g:'salon',t:'Неявки',ic:'ban',d:'Автоматичні відмітки та блокування',r:function(){
    return num('settings.noshow.markAfter','Позначати «Не прийшов» через','Якщо клієнт не відмічений як «Прийшов» після початку візиту','хв',{min:5,max:240})+
    num('settings.noshow.warnAt','Попереджати після','Адміністратор побачить мітку в картці клієнта','неявок',{min:1,max:10})+
    num('settings.noshow.blockAt','Блокувати онлайн-запис після','Клієнт у чорному списку записується тільки через адміністратора','неявок',{min:1,max:20})+
    (gp('settings.noshow.warnAt')>gp('settings.noshow.blockAt')?noteBox('warn','Поріг блокування менший за поріг попередження — спочатку клієнт буде заблокований, а попередження не покажемо.'):'')}},
- {id:'pay',t:'Способи оплати',ic:'card',d:'Готівка, картка, перекази',r:function(){
+ {id:'pay',g:'money',t:'Способи оплати',ic:'card',d:'Готівка, картка, перекази',r:function(){
    return '<div class="list sy-paylist">'+App.db.pay.map(function(m){return '<div class="li"><span class="sy-cic">'+ic(m.ic||'coins')+'</span><div class="t"><b>'+esc(m.n)+'</b><small>'+({cash:'Готівка',card:'Картка'+(m.feePct?' · комісія '+P1(m.feePct)+'%':''),transfer:'Переказ'}[m.kind]||m.kind)+'</small></div><label class="sw"><input type="checkbox" data-sy="pay-on" data-id="'+m.id+'"'+(m.on!==false?' checked':'')+'><i></i></label><button class="icobtn sm" data-sy="pay-edit" data-id="'+m.id+'" aria-label="Редагувати">'+ic('edit')+'</button></div>'}).join('')+'</div>'+
    '<div class="sy-actions"><button class="btn" data-sy="pay-add">'+ic('plus')+' Додати спосіб</button></div>'+noteBox('','Вимкнений спосіб не показується в касі, але історія платежів зберігається. Комісія еквайрингу враховується в прибутку у звітах.')}},
- {id:'accounting',t:'Облік',ic:'receipt',d:'Сертифікати, чайові, каса',r:function(){var cr=gp('settings.accounting.certRevenue');
+ {id:'accounting',g:'money',t:'Облік',ic:'receipt',d:'Сертифікати, чайові, каса',r:function(){var cr=gp('settings.accounting.certRevenue');
    return '<div class="set-row stack"><div class="t"><b>Коли сертифікат стає виторгом</b><small>Впливає на звіти та зарплату</small></div></div><div class="sy-radio">'+
    [['redeem','Коли клієнт ним розплатився','Рекомендовано. Продаж сертифіката — це лише гроші в касі (зобовʼязання перед клієнтом), виторг зʼявляється, коли послуга надана. Так податки і зарплата рахуються за реально виконану роботу.'],['sale','У день продажу','Простіше в обліку: виторг зараховується одразу. Мінус — гроші зараховані, а послуга ще не надана; при використанні сертифіката виторг вдруге не рахується.']].map(function(o){return '<label class="sy-opt'+(cr===o[0]?' on':'')+'"><input type="radio" name="certRev" data-set="settings.accounting.certRevenue" data-t="str" data-l="Виторг із сертифікатів" value="'+o[0]+'"'+(cr===o[0]?' checked':'')+'><span><b>'+o[1]+'</b><small>'+o[2]+'</small></span></label>'}).join('')+'</div>'+
    num('settings.accounting.tipsToMaster','Чайові майстру','Яка частина чайових іде майстру','%',{min:0,max:100})+
    tgl('settings.accounting.dayClose','Обовʼязкове закриття дня','Щодня звіряти готівку в касі з розрахунковою. Незакриті дні підсвічуються на «Сьогодні»')+
    sl('settings.accounting.roundTo','Округлення ціни','Підсумок візиту округлюється до',[[0,'Без округлення'],[1,'1 ₴'],[5,'5 ₴'],[10,'10 ₴']],{t:'num'})+
    row('Касовий апарат (ПРРО Checkbox)','Автоматичні фіскальні чеки при оплаті <span class="badge plain">скоро</span>','<label class="sw"><input type="checkbox" disabled><i></i></label>')}},
- {id:'payroll',t:'Зарплата',ic:'wallet',d:'Правила нарахування',r:function(){
+ {id:'payroll',g:'money',t:'Зарплата',ic:'wallet',d:'Правила нарахування',r:function(){
    return sl('settings.payroll.period','Розрахунковий період','Як часто виплачуєте майстрам',[['week','Тиждень'],['half','Півмісяця'],['month','Місяць']])+
    sl('settings.payroll.basis','База для відсотка','Від якої суми майстер отримує відсоток',[['afterDiscount','Після знижки'],['beforeDiscount','До знижки']])+
    tgl('settings.payroll.certAsRevenue','Оплата сертифікатом входить у відсоток','Майстер отримує відсоток і з візитів, оплачених сертифікатом')+
-   num('settings.payroll.productPctDefault','Відсоток із продажу товарів','За замовчуванням для нових майстрів','%',{min:0,max:100})+noteBox('','Індивідуальні відсотки та фіксовані ставки задаються в картці майстра («Команда»).')}},
- {id:'modules',t:'Модулі',ic:'layers',d:'Увімкніть тільки потрібне',r:function(){
+   num('settings.payroll.productPctDefault','Відсоток із продажу товарів','За замовчуванням для нових майстрів','%',{min:0,max:100})+
+   num('settings.payroll.certSalePct','Відсоток із продажу сертифікатів','Хто продав сертифікат, отримує цей % від номіналу','%',{min:0,max:100})+
+   num('settings.payroll.abonSalePct','Відсоток із продажу абонементів','Хто продав абонемент, отримує цей % від ціни','%',{min:0,max:100})+noteBox('','Індивідуальні відсотки та фіксовані ставки задаються в картці майстра («Команда»).')}},
+ {id:'modules',g:'sys',t:'Модулі',ic:'layers',d:'Увімкніть тільки потрібне',r:function(){
    var M=[['certs','Сертифікати','Подарункові сертифікати: продаж, баланс, погашення'],['abons','Абонементи','Пакети процедур зі знижкою'],['products','Товари','Склад і продаж косметики'],['tasks','Задачі','Список справ для команди'],['reviews','Відгуки','Збір та відповіді на відгуки'],['resources','Ресурси','Столи, крісла, кабінети — запис займає ресурс'],['deposits','Передоплата','Облік передоплат і їх повернень'],['waitlist','Лист очікування','Клієнти, які чекають вільного місця']];
    return M.map(function(m){return tgl('settings.modules.'+m[0],m[1],m[2])}).join('')+'<p class="sy-hint">Вимкнені модулі зникають із меню; дані не видаляються.</p>'}},
- {id:'roles',t:'Ролі та доступ',ic:'key',d:'Хто що бачить і може',r:function(){return rolesHtml()}},
- {id:'alert',t:'Режим тривоги',ic:'siren',d:'Повітряна тривога в області',r:function(){var a=gp('settings.alert');
+ {id:'roles',g:'team',t:'Ролі та доступ',ic:'key',d:'Хто що бачить і може',r:function(){return rolesHtml()}},
+ {id:'alert',g:'sys',t:'Режим тривоги',ic:'siren',d:'Повітряна тривога в області',r:function(){var a=gp('settings.alert');
    var regs=['Вінницька область','Волинська область','Дніпропетровська область','Донецька область','Житомирська область','Закарпатська область','Запорізька область','Івано-Франківська область','Київська область','Кіровоградська область','Луганська область','Львівська область','Миколаївська область','Одеська область','Полтавська область','Рівненська область','Сумська область','Тернопільська область','Харківська область','Херсонська область','Хмельницька область','Черкаська область','Чернівецька область','Чернігівська область','м. Київ'];
    return (a.on?'<div class="note dng sy-note">'+ic('siren','s')+'<span><b>Триває тривога.</b> '+(a.mode==='pause'?'Онлайн-запис призупинено.':'Клієнти бачать попередження про тривогу.')+'</span><button class="btn sm" data-sy="alert-off">Відбій</button></div>':'')+
    tgl('settings.alert.on','Режим тривоги','Вмикається вручну або автоматично за даними сповіщень вашої області')+
    sl('settings.alert.region','Область','Звідки брати сигнали',regs.map(function(r){return [r,r]}))+
    sl('settings.alert.mode','Що робити під час тривоги','Призупинити — онлайн-запис недоступний, чинні записи не змінюються. Попереджати — клієнт бачить повідомлення, але може записатись',[['pause','Призупинити онлайн-запис'],['notify','Лише попереджати']])+
    '<div class="sy-actions"><button class="btn'+(a.on?'':' dng')+'" data-sy="alert-sim">'+ic('siren')+' '+(a.on?'Відбій тривоги':'Симулювати тривогу')+'</button></div>'}},
- {id:'offline',t:'Офлайн-режим',ic:'wifioff',d:'Робота без інтернету',r:function(){var off=gp('settings.offline');
+ {id:'offline',g:'sys',t:'Офлайн-режим',ic:'wifioff',d:'Робота без інтернету',r:function(){var off=gp('settings.offline');
    return (off?'<div class="note warn sy-note">'+ic('wifioff','s')+'<span><b>Немає звʼязку.</b> Зміни зберігаються на пристрої.</span><button class="btn sm" data-sy="off-sim">Відновити</button></div>':'')+
    '<div class="card sy-expl"><b>Що відбувається без інтернету</b><ul><li>Календар, картки клієнтів і каса працюють — дані зберігаються на пристрої.</li><li>Усі зміни позначаються й автоматично синхронізуються, коли зʼявиться звʼязок.</li><li>Нагадування клієнтам та онлайн-запис відновляться після підключення.</li><li>У верхній панелі зʼявиться жовтий індикатор «Офлайн».</li></ul></div>'+
    '<div class="sy-actions"><button class="btn" data-sy="off-sim">'+ic('wifioff')+' '+(off?'Відновити звʼязок':'Симулювати офлайн')+'</button></div>'}},
- {id:'data',t:'Дані та імпорт',ic:'download',d:'Експорт, імпорт, скидання демо',r:function(){var db=App.db;
+ {id:'data',g:'sys',t:'Дані та імпорт',ic:'download',d:'Експорт, імпорт, скидання демо',r:function(){var db=App.db;
    return row('Експорт усіх даних','Повна копія в JSON — клієнти, записи, платежі, налаштування','<button class="btn" data-sy="exp-json">'+ic('download')+' JSON</button>')+
    row('Клієнти','CSV для Excel · '+U.fmt(db.clients.length),'<button class="btn" data-sy="exp-clients">'+ic('download')+' CSV</button>')+
    row('Записи','CSV · '+U.fmt(db.appts.length),'<button class="btn" data-sy="exp-appts">'+ic('download')+' CSV</button>')+
    row('Платежі','CSV · '+U.fmt(db.payments.length),'<button class="btn" data-sy="exp-pays">'+ic('download')+' CSV</button>')+
    '<h4 class="sy-h4">Імпорт клієнтів</h4>'+row('З Altegio, DIKIDI, Excel','Завантажте CSV або вставте таблицю — перед імпортом ви побачите, які колонки куди підуть','<button class="btn pri" data-sy="imp">'+ic('upload')+' Імпортувати</button>')+
    '<h4 class="sy-h4">Демо</h4>'+row('Скинути демо-дані','Усі зміни буде втрачено, повернуться стартові дані','<button class="btn dng" data-sy="reset">'+ic('undo')+' Скинути</button>')}},
- {id:'plan',t:'Тариф',ic:'zap',d:'Салон · 449 ₴/міс',r:function(){var db=App.db,nm=db.staff.filter(function(s){return s.role==='master'&&s.active}).length;
-   var PL=[['Старт','0',['1 майстер','Календар і клієнти','До 100 клієнтів'],1,100],['Соло','199',['До 2 майстрів','Нагадування в Telegram','Базові звіти'],2,0],['Салон','449',['До 10 майстрів','Усі модулі','Передоплата, зарплата, звіти'],10,0],['Мережа','999',['Необмежено майстрів','Кілька філій','Пріоритетна підтримка'],99,0]];
-   return '<div class="card sy-usage"><h3>Використання</h3><div class="sy-use"><div><small>Майстри</small><b>'+nm+' <em>з 10</em></b><div class="bar-h"><i style="width:'+Math.min(100,nm*10)+'%"></i></div></div><div><small>Клієнти</small><b>'+U.fmt(db.clients.length)+' <em>без ліміту</em></b></div><div><small>Записів за 30 днів</small><b>'+U.fmt(db.appts.filter(function(a){return a.date>=D.add(T(),-29)&&a.date<=T()}).length)+'</b></div></div></div>'+
-   '<div class="sy-plans">'+PL.map(function(p){var cur=p[0]==='Салон';return '<div class="card sy-plan'+(cur?' cur':'')+'"><b>'+p[0]+'</b><div class="pr">'+p[1]+' <small>₴/міс</small></div><ul>'+p[2].map(function(x){return '<li>'+ic('check','s')+x+'</li>'}).join('')+'</ul>'+(cur?'<span class="badge ok">Ваш тариф</span>':'<button class="btn blk" data-sy="plan">Обрати</button>')+'</div>'}).join('')+'</div>'+
-   '<p class="sy-hint">У демо тариф лише відображається. Оплата та перехід між тарифами працюватимуть у робочій версії.</p>'}}
+ {id:'plan',g:'sys',t:'Тариф',ic:'zap',d:'Салон · 449 ₴/міс',r:function(){var db=App.db,nm=db.staff.filter(function(s){return s.role==='master'&&s.active}).length;
+   var PL=[['Старт','0','Спробувати самому',['1 майстер, до 40 записів на місяць','Сторінка запису й Telegram-бот команди','Клієнти та експорт']],['Майстер','199','Майстер-одинак',['1 майстер, без ліміту записів','Нагадування в Telegram, каса, сертифікати','Лист очікування, фото, анкети']],['Салон','449','2–8 майстрів',['Усе з «Майстер»','Ролі й доступи, зарплати, закриття дня','Звіти по майстрах, склад, офлайн']],['Салон+','999','9–15 майстрів',['Усе з «Салон»','AI-помічник у звітах','Пріоритетна підтримка, перенесення бази']]];
+   return '<div class="card sy-usage"><h3>Використання</h3><div class="sy-use"><div><small>Майстри</small><b>'+nm+' <em>з 8</em></b><div class="bar-h"><i style="width:'+Math.min(100,Math.round(nm/8*100))+'%"></i></div></div><div><small>Клієнти</small><b>'+U.fmt(db.clients.length)+' <em>без ліміту</em></b></div><div><small>Записів за 30 днів</small><b>'+U.fmt(db.appts.filter(function(a){return a.date>=D.add(T(),-29)&&a.date<=T()}).length)+' <em>без ліміту</em></b></div></div></div>'+
+   '<div class="sy-plans">'+PL.map(function(p){var cur=p[0]==='Салон';return '<div class="card sy-plan'+(cur?' cur':'')+'"><div><b>'+p[0]+'</b><small class="mute sy-pfor">'+p[2]+'</small></div><div class="pr num">'+p[1]+' <small>₴/міс</small></div><ul>'+p[3].map(function(x){return '<li>'+ic('check','s')+x+'</li>'}).join('')+'</ul>'+(cur?'<span class="badge ok">Ваш тариф</span>':'<button class="btn blk" data-sy="plan">Обрати</button>')+'</div>'}).join('')+'</div>'+
+   '<div class="set-row sy-net"><div class="t"><b>Мережа — договірна ціна</b><small>Кілька філій, спільна база клієнтів і звіти по мережі</small></div><button class="btn" data-sy="plan">Звʼязатися</button></div>'+
+   '<p class="sy-hint">Ціна плоска, без комісії за клієнтів. Платно зверху лише SMS і Viber — за собівартістю. У демо тариф лише відображається.</p>'}}
 ];
 /* ролі */
 var PERM_ROWS=[['Дашборд «Сьогодні»','home'],['Календар: усі записи','calendar.*'],['Календар: лише свої','calendar.own'],['Клієнти: усі','clients.*'],['Клієнти: лише свої','clients.own'],['Прийом оплати візиту','checkout'],['Каса: перегляд','cash.view'],['Каса: операції','cash.ops'],['Витрати: додавати','expenses.add'],['Витрати: повний доступ','expenses.*'],['Сертифікати: керування','certs.*'],['Сертифікати: перегляд','certs.view'],['Абонементи: керування','abons.*'],['Абонементи: перегляд','abons.view'],['Товари: продаж','products.sell'],['Товари: перегляд','products.view'],['Задачі: усі','tasks.*'],['Задачі: лише свої','tasks.own'],['Відгуки','reviews.*'],['Графіки: усі','schedules.*'],['Графік: лише свій','schedules.own'],['Послуги: перегляд','services.view'],['Команда: перегляд','team.view'],['Зарплата: усі','payroll.*'],['Зарплата: лише своя','payroll.own'],['Звіти: повні','reports.*'],['Звіти: підсумки дня','reports.day'],['Журнал дій','audit.view']];
 var ROLE_COLS=[['owner','Власн.'],['admin','Адмін'],['master','Майстер'],['accountant','Бухг.']];
 function permOn(role,perm){var a=App.PERMS[role];if(a==='*')return {on:true,locked:true};if(a.indexOf(perm)>=0)return {on:true};var m=perm.split('.')[0];if(perm.indexOf('.')>0&&perm!==m+'.*'&&a.indexOf(m+'.*')>=0)return {on:true,derived:true};return {on:false}}
 function rolesHtml(){
-  var h=noteBox('','Налаштуйте, що бачать і можуть адміністратор, майстер і бухгалтер. Власник має повний доступ завжди. «Усі» включає «лише свої».')+
+  var h='<h4 class="sy-h4" style="margin-top:4px">Головне для майстрів</h4>'+tgl('settings.access.hidePhones','Приховати телефони клієнтів від майстрів','Майстер бачить імʼя й історію, але не номер — клієнтська база лишається в салоні')+tgl('settings.access.masterPay','Майстер приймає оплату','Майстер може закрити свій візит і прийняти гроші в касу')+tgl('settings.access.masterBook','Майстер записує сам','Майстер може створювати записи у свій календар')+
+   '<h4 class="sy-h4">Права за ролями</h4>'+noteBox('','Налаштуйте, що бачать і можуть адміністратор, майстер і бухгалтер. Власник має повний доступ завжди. «Усі» включає «лише свої».')+
    '<div class="card flush sy-roles"><div class="sy-rrow hd"><span>Можливість</span>'+ROLE_COLS.map(function(c){return '<span>'+c[1]+'</span>'}).join('')+'</div>';
   PERM_ROWS.forEach(function(p){h+='<div class="sy-rrow"><span>'+p[0]+'</span>'+ROLE_COLS.map(function(c){var s=permOn(c[0],p[1]),dis=s.locked||s.derived;
     return '<label class="sy-rc" title="'+(s.locked?'Власник має повний доступ':s.derived?'Дозволено через «'+p[1].split('.')[0]+'.*»':c[1])+'"><input type="checkbox" data-sy="perm" data-role="'+c[0]+'" data-perm="'+p[1]+'"'+(s.on?' checked':'')+(dis?' disabled':'')+' aria-label="'+esc(p[0]+' — '+c[1])+'"></label>'}).join('')+'</div>'});
@@ -577,12 +513,167 @@ function csvClients(){return U.csv([['Імʼя','Телефон','Дата на�
 function csvAppts(){return U.csv([['Дата','Початок','Майстер','Клієнт','Послуги','Статус','Сума']].concat(App.db.appts.slice().sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:a.start-b.start}).map(function(a){return [a.date,U.hm(a.start),sname(a.staff),cname(a.client),App.apptTitle(a),(App.ST[a.status]||{}).n||a.status,Math.round(App.apptTotal(a))]})))}
 function csvPays(){return U.csv([['Дата','Тип','Спосіб','Сума','Майстер','Запис']].concat(App.db.payments.slice().sort(function(a,b){return a.date<b.date?-1:1}).map(function(p){return [p.date,p.kind,App.payMethod(p.method).n,p.amount,p.staff?sname(p.staff):'',p.appt||'']})))}
 
-App.route('settings',{title:'Налаштування',icon:'cog',nav:true,group:'sys',order:30,perm:'settings.manage',render:function(v,params,q){
-  var sid=params[0],sec=SECTIONS.find(function(s){return s.id===sid}),cur=sec||SECTIONS[0];
+/* ═════════════ B4: повідомлення, Telegram, анкети, розсилки, онлайн-запис ═════════════ */
+var TPL_N={confirm:'Підтвердження',h24:'За 24 год',h2:'За 2 год',move:'Перенесення',cancel:'Скасування',review:'Відгук',ret:'Повернення',wait:'Лист очікування',camp:'Розсилка'};
+var SERVICE_TPL=['confirm','h24','h2','move','cancel','review','wait'];
+var CH_N={tg:'Telegram',viber:'Viber',sms:'SMS',auto:'Авто'};
+var MST_N={delivered:'Доставлено',read:'Прочитано',sent:'Надіслано',failed:'Не доставлено'};
+function firstName(n){return String(n||'Клієнт').split(' ')[0]}
+/* дані демо-клієнта для превʼю шаблонів: найближчий активний запис */
+function demoCtx(){var db=App.db,T0=T();
+  var a=db.appts.filter(function(x){return x.date>=T0&&x.client&&App.active(x)}).sort(function(x,y){return (x.date+String(x.start).padStart(4,'0'))<(y.date+String(y.start).padStart(4,'0'))?-1:1})[0];
+  var c=a&&App.client(a.client),m=a&&App.staff(a.staff);
+  return {n:c?firstName(c.n):'Олена',svc:a?App.apptTitle(a):'Манікюр з покриттям',date:a?D.human(a.date):'завтра',time:a?U.hm(a.start):'14:00',m:m?m.short:'Ірина',salon:App.db.salon.name,link:(gp('settings.booking.link')||'sola.slotly.ua')+'/r/7KQ'}}
+function fillT(t,x){x=x||demoCtx();return esc(String(t||'')).replace(/\{імʼя\}/g,esc(x.n)).replace(/\{послуга\}/g,esc(x.svc)).replace(/\{дата\}/g,esc(x.date)).replace(/\{час\}/g,esc(x.time)).replace(/\{майстер\}/g,esc(x.m)).replace(/\{салон\}/g,esc(x.salon)).replace(/\{посилання\}/g,esc(x.link))}
+var NEV=[['confirm','Підтвердження запису','Одразу після запису: дата, час, майстер і кнопки «Так / Перенести / Скасувати»'],
+ ['h24','За 24 години до візиту','Клієнт підтверджує або скасовує одним дотиком'],
+ ['h2','За 2 години до візиту','Коротке нагадування з адресою'],
+ ['review','Запит на відгук','Після візиту, через кілька годин','reviewDelayH','год',1,48],
+ ['ret','Повернення клієнта','Якщо клієнт не записався після візиту','returnDays','днів',7,180]];
+function notifyHtml(){var n=gp('settings.notify')||{},x=demoCtx();if(n.ret==null)n.ret=(n.returnDays||0)>0;n.tpl=n.tpl||{};
+  var casc=(n.cascade||['tg','viber','sms']).slice();
+  var h='<h4 class="sy-h4" style="margin-top:4px">Події</h4><div class="sy-evs">'+NEV.map(function(e){var on=!!n[e[0]],tp=n.tpl[e[0]]||App.TPL[e[0]]||'';
+    return '<div class="sy-ev'+(on?'':' off')+'">'+row(e[1],e[2],'<label class="sw"><input type="checkbox" data-set="settings.notify.'+e[0]+'" data-t="bool" data-l="'+esc(e[1])+'"'+(on?' checked':'')+'><i></i></label>')+
+     (e[3]?'<div class="set-row sy-evp"><div class="t"><small>'+(e[0]==='review'?'Надіслати через':'Нагадати через')+'</small></div><div class="inp-suf sy-ctl"><input type="number" inputmode="numeric" data-set="settings.notify.'+e[3]+'" data-t="num" data-l="'+esc(e[1])+'" value="'+(n[e[3]]||0)+'" min="'+e[5]+'" max="'+e[6]+'"'+(on?'':' disabled')+'><span>'+e[4]+'</span></div></div>':'')+
+     '<details class="sy-tpl"><summary>'+ic('msg','s')+'Шаблон повідомлення</summary><div class="sy-tplg"><label class="fld"><span>Текст <small>{імʼя} {послуга} {дата} {час} {майстер} {салон} {посилання}</small></span><textarea class="inp" rows="4" data-set="settings.notify.tpl.'+e[0]+'" data-t="str" data-l="Шаблон «'+esc(e[1])+'»" data-tplk="'+e[0]+'">'+esc(tp)+'</textarea></label>'+
+     '<div class="sy-prev"><small class="mute">Так побачить клієнт ('+esc(x.n)+')</small><div class="bubble" data-prev="'+e[0]+'">'+fillT(tp,x)+'</div></div></div></details></div>'}).join('')+'</div>';
+  h+='<h4 class="sy-h4">Коли й куди</h4>'+row('Тихі години','У цей час повідомлення не надсилаються — підуть зранку','<div class="sy-quiet"><input class="inp" type="time" data-set="settings.notify.quietFrom" data-t="str" data-l="Тихі години з" value="'+esc(n.quietFrom||'21:00')+'" aria-label="З"><span class="mute">—</span><input class="inp" type="time" data-set="settings.notify.quietTo" data-t="str" data-l="Тихі години до" value="'+esc(n.quietTo||'09:00')+'" aria-label="До"></div>','stack');
+  h+=row('Порядок каналів','Якщо клієнт не в першому месенджері — пробуємо наступний','','stack')+'<div class="list sy-casc">'+casc.map(function(c,i){
+    return '<div class="li"><span class="sy-cn num">'+(i+1)+'</span><span class="t"><b>'+CH_N[c]+'</b><small>'+(c==='tg'?'Безкоштовно, з кнопками «Так / Перенести»':c==='viber'?'За собівартістю, з балансу салону':'≈ 1,3 ₴ за повідомлення, лише за згоди клієнта')+'</small></span>'+
+     '<button class="icobtn ghost" data-sy="casc" data-i="'+i+'" data-d="-1" aria-label="Вище"'+(i?'':' disabled')+'>'+ic('up','s')+'</button><button class="icobtn ghost" data-sy="casc" data-i="'+i+'" data-d="1" aria-label="Нижче"'+(i<casc.length-1?'':' disabled')+'>'+ic('down','s')+'</button></div>'}).join('')+'</div>';
+  h+=tgl('settings.notify.team','Сповіщати команду','Майстер отримує в Telegram свої нові, перенесені й скасовані записи');
+  var ms=(App.db.msgs||[]).slice().sort(function(a,b){return a.ts<b.ts?1:-1}).slice(0,20);
+  h+='<h4 class="sy-h4">Журнал доставки</h4>'+(ms.length?rtable(['Клієнт','Час','Канал','Подія','Статус','Відповідь'],ms.map(function(m){var c=App.client(m.client);
+    return [c?'<a class="sy-lk" data-sy="client" data-id="'+c.id+'">'+esc(c.n)+'</a>':'—',esc(D.shortH(m.ts.slice(0,10))+' '+m.ts.slice(11,16)),CH_N[m.ch]||m.ch,TPL_N[m.tpl]||(m.tpl?esc(m.tpl):'Розсилка'),'<span class="badge '+(m.status==='failed'?'dng':m.status==='read'?'ok':'plain')+'">'+(MST_N[m.status]||m.status)+'</span>',m.reply?esc(m.reply):'<span class="faint">—</span>']})):
+    UI.empty('msg','Повідомлень ще не було','Коли клієнти отримають нагадування, тут буде видно, кому, яким каналом і що відповіли.'));
+  return h}
+function tgHtml(){var t=gp('settings.telegram')||{},x=demoCtx(),n=gp('settings.notify')||{},tp=(n.tpl||{});
+  var h='<div class="card sy-tgst"><span class="sy-cic">'+ic('tg')+'</span><div class="t"><b>'+(t.connected!==false?'Підключено · ':'Не підключено · ')+esc(t.bot||'@sola_beauty_bot')+'</b><small>Бот пише від імені салону — клієнти не бачать особисті номери майстрів.</small></div><span class="badge '+(t.connected!==false?'ok':'plain')+'">'+(t.connected!==false?'Працює':'Вимкнено')+'</span></div>';
+  h+='<div class="sy-tgg">'+[['clientBot','Бот для клієнтів',['Запис і перенесення в чаті','Нагадування з кнопками','Лист очікування: «звільнилось місце»','Запит на відгук після візиту']],['teamBot','Бот для команди',['Нові записи, зокрема онлайн','Перенесені й скасовані записи','Підсумок дня власниці о 21:00','Нагадування про незакритий день']]].map(function(b){var on=!!t[b[0]];
+    return '<div class="card sy-tgb'+(on?'':' off')+'"><div class="row g12"><b class="sy-grow">'+b[1]+'</b><label class="sw"><input type="checkbox" data-set="settings.telegram.'+b[0]+'" data-t="bool" data-l="'+b[1]+'"'+(on?' checked':'')+' aria-label="'+b[1]+'"><i></i></label></div><ul>'+b[2].map(function(l){return '<li>'+ic('check','s')+l+'</li>'}).join('')+'</ul></div>'}).join('')+'</div>';
+  h+='<h4 class="sy-h4">Як це бачить клієнт</h4><div class="card sy-chat"><div class="bubble">'+fillT(tp.confirm||App.TPL.confirm,x)+'<small>10:02</small></div><div class="bubble">'+fillT(tp.h24||App.TPL.h24,x)+'<small>завтра, 10:00</small></div>'+
+   '<div class="sy-tgbtns"><span>Так, буду</span><span>Перенести</span><span>Скасувати</span></div><div class="bubble me">Так, буду<small>10:05</small></div><div class="bubble">Дякуємо! Чекаємо вас.</div></div>';
+  h+='<div class="sy-actions"><button class="btn" data-sy="tg-sim">'+ic('tg','s')+' Симулювати відповідь «Так»</button></div><p class="sy-hint">Демо: найближчий непідтверджений запис стане «Підтверджено», як після натискання кнопки в Telegram.</p>';
+  return h}
+var FORMS=[['first','Перший візит','Для всіх нових клієнтів',['Чи є алергія на препарати або косметику?','Хронічні захворювання, про які варто знати майстру','Вагітність або годування груддю','Як ви про нас дізналися?','Згода на обробку персональних даних']],
+ ['tattoo','Тату','Перед сеансом',['Вам виповнилось 18 років (документ на сеансі)','Шкірні захворювання в зоні роботи','Чи приймаєте ліки, що розріджують кров?','Алкоголь за останні 24 години','Згода на процедуру та правила догляду']],
+ ['cosmo','Косметологія','Перед чистками й пілінгами',['Алергії та чутливість шкіри','Ретиноїди або кислоти за останні 2 тижні','Свіжа засмага чи солярій','Вагітність','Згода на фото до/після']]];
+function formsHtml(){
+  return noteBox('','Анкета — короткий список питань, який клієнт заповнює з телефону до візиту. Відповіді зберігаються в картці клієнта. У демо питання лише для перегляду.')+
+   '<div class="col-f g12">'+FORMS.map(function(f){return '<div class="card sy-form"><div class="row g12"><span class="sy-cic">'+ic('note')+'</span><div class="t sy-grow"><b>'+f[1]+'</b><small class="mute">'+f[2]+' · '+f[3].length+' питань</small></div><button class="btn sm" data-sy="form-send" data-k="'+f[0]+'">'+ic('link','s')+' Надіслати посилання</button></div><ol>'+f[3].map(function(q){return '<li>'+esc(q)+'</li>'}).join('')+'</ol></div>'}).join('')+'</div>'}
+
+/* сегменти розсилок */
+var SEGS=[['lost','Давно не були (45+ днів)'],['bd','Іменинники місяця'],['new1','Нові без 2-го візиту'],['tag','Свій тег']];
+function segInfo(k,tag,cache){cache=cache||{};var T0=T(),db=App.db,ms=T0.slice(5,7),since=D.add(T0,-29);
+  var got={};(db.msgs||[]).forEach(function(m){if(m.client&&m.ts.slice(0,10)>=since&&SERVICE_TPL.indexOf(m.tpl)<0)got[m.client]=1});
+  var all=db.clients.filter(function(c){if(c.blocked)return false;var st=cache[c.id]||(cache[c.id]=App.clientStats(c.id));
+    if(k==='lost')return st.visits>0&&st.daysSince!=null&&st.daysSince>=45&&!st.next;
+    if(k==='bd')return !!c.bd&&c.bd.slice(5,7)===ms;
+    if(k==='new1')return st.visits===1&&!st.next&&st.daysSince!=null&&st.daysSince>=14;
+    if(k==='tag')return !!tag&&(c.tags||[]).indexOf(tag)>=0;return false});
+  var noC=all.filter(function(c){return (c.consent&&c.consent.promo===false)||(!c.tg&&!c.ph)});
+  var rec=all.filter(function(c){return noC.indexOf(c)<0&&!got[c.id]});
+  return {all:all,rec:rec,skipped:all.filter(function(c){return noC.indexOf(c)<0&&got[c.id]}),noConsent:noC}}
+function segTpl(k){return k==='bd'?'{імʼя}, з наближенням дня народження! Даруємо −10% на будь-яку послугу до кінця місяця: {посилання}':k==='new1'?'{імʼя}, дякуємо, що обрали {салон}! Запишіться на наступний візит до {майстер}: {посилання}':App.TPL.ret}
+function allTags(){return (App.db.tags||[]).map(function(t){return t.id})}
+function tagN(id){var t=(App.db.tags||[]).find(function(x){return x.id===id});return t?t.n:id}
+function campForm(draft){var db=App.db,o=draft?Object.assign({},draft):{name:'',seg:'lost',tag:'',txt:segTpl('lost'),ch:'tg'},cache={};
+  var tags=allTags();if(o.seg==='tag'&&!o.tag)o.tag=tags[0]||'';
+  function chSeg(){return [['tg','Telegram'],['viber','Viber'],['sms','SMS']].map(function(c){return '<button type="button" data-ch="'+c[0]+'" aria-pressed="'+(o.ch===c[0])+'">'+c[1]+'</button>'}).join('')}
+  function sumHtml(){var s=segInfo(o.seg,o.tag,cache);
+    return '<div class="sy-csum"><b class="num">'+s.rec.length+'</b><span>'+U.plural(s.rec.length,'клієнт отримає','клієнти отримають','клієнтів отримають')+'</span></div>'+
+     (s.skipped.length?'<div class="note sy-note">'+ic('info','s')+'<span>'+s.skipped.length+' '+U.plural(s.skipped.length,'клієнт пропущено','клієнти пропущено','клієнтів пропущено')+': вже отримували розсилку цього місяця (не частіше 1 разу на 30 днів).</span></div>':'')+
+     (s.noConsent.length?'<p class="sy-hint" style="margin-top:0">Ще '+s.noConsent.length+' без згоди на розсилки або без контакту — їм не надсилаємо.</p>':'')+
+     (o.ch==='sms'&&s.rec.length?'<p class="sy-hint" style="margin-top:0">SMS: ≈ '+U.uah(Math.round(s.rec.length*1.3))+' з балансу салону.</p>':'')}
+  var m=UI.modal({title:draft&&draft.id?'Розсилка':'Нова розсилка',size:'wide',
+   body:'<div class="col-f g12 sy-cf"><label class="fld"><span>Кому</span><select class="sel" name="seg">'+SEGS.map(function(s){return '<option value="'+s[0]+'"'+(o.seg===s[0]?' selected':'')+'>'+s[1]+'</option>'}).join('')+'</select></label>'+
+    '<label class="fld" data-tagf'+(o.seg==='tag'?'':' hidden')+'><span>Тег</span><select class="sel" name="tag">'+(tags.length?tags.map(function(t){return '<option value="'+esc(t)+'"'+(t===o.tag?' selected':'')+'>'+esc(tagN(t))+'</option>'}).join(''):'<option value="">Тегів ще немає</option>')+'</select></label>'+
+    '<label class="fld"><span>Назва <small>бачите тільки ви</small></span><input class="inp" name="name" maxlength="60" value="'+esc(o.name)+'" placeholder="Напр. Повернення в листопаді"></label>'+
+    '<div class="grid2 m1 sy-cfg"><label class="fld"><span>Текст <small>{імʼя} {майстер} {посилання}</small></span><textarea class="inp" name="txt" rows="5">'+esc(o.txt)+'</textarea></label><div class="sy-prev"><small class="mute">Превʼю</small><div class="bubble" data-cprev>'+fillT(o.txt)+'</div></div></div>'+
+    '<div class="fld"><span>Канал</span><div class="seg sy-chseg">'+chSeg()+'</div></div><div data-csum>'+sumHtml()+'</div></div>',
+   foot:'<button class="btn ghost" data-cdraft>Зберегти чернетку</button><span class="sp"></span><button class="btn" data-x2>Скасувати</button><button class="btn pri" data-csend>'+ic('msg','s')+' Надіслати</button>',
+   onMount:function(el,cl){
+    function upd(){U.$('[data-csum]',el).innerHTML=sumHtml();var tf=U.$('[data-tagf]',el);tf.hidden=o.seg!=='tag'}
+    el.addEventListener('input',function(e){var t=e.target;if(t.name==='txt'){o.txt=t.value;U.$('[data-cprev]',el).innerHTML=fillT(o.txt)}if(t.name==='name')o.name=t.value;el.setAttribute('data-dirty','1')});
+    el.addEventListener('change',function(e){var t=e.target;if(t.name==='seg'){var old=segTpl(o.seg);o.seg=t.value;if(o.seg==='tag'&&!o.tag)o.tag=tags[0]||'';if(!o.txt||o.txt===old){o.txt=segTpl(o.seg);U.$('[name=txt]',el).value=o.txt;U.$('[data-cprev]',el).innerHTML=fillT(o.txt)}upd()}if(t.name==='tag'){o.tag=t.value;upd()}});
+    el.addEventListener('click',function(e){var b=e.target.closest('[data-ch]');if(b){o.ch=b.dataset.ch;U.$('.sy-chseg',el).innerHTML=chSeg();upd();return}
+     if(e.target.closest('[data-x2]'))return cl();
+     function save(){var nm=(o.name||'').trim()||(SEGS.find(function(s){return s[0]===o.seg})[1]+(o.seg==='tag'&&o.tag?': '+tagN(o.tag):''));
+       return App.ops.campaign({id:o.id,name:nm,seg:o.seg,tag:o.tag||'',txt:o.txt,tpl:'camp',ch:o.ch})}
+     if(e.target.closest('[data-cdraft]')){if(!String(o.txt||'').trim())return UI.toast('Напишіть текст повідомлення',{type:'err'});save();cl();UI.toast('Чернетку збережено');return App.render()}
+     if(e.target.closest('[data-csend]')){var s=segInfo(o.seg,o.tag,cache);if(!String(o.txt||'').trim())return UI.toast('Напишіть текст повідомлення',{type:'err'});if(!s.rec.length)return UI.toast('У цьому сегменті нікому надсилати',{type:'err'});
+       UI.confirm({title:'Надіслати '+s.rec.length+' '+U.plural(s.rec.length,'клієнту','клієнтам','клієнтам')+'?',text:CH_N[o.ch]+'. Скасувати після надсилання не можна.'+(s.skipped.length?' '+s.skipped.length+' пропущено: вже отримували цього місяця.':''),ok:'Надіслати'}).then(function(y){if(!y)return;
+        var x=save();App.ops.sendCampaign(x.id,s.rec.map(function(c){return c.id}));cl();UI.toast('Розсилку надіслано: '+s.rec.length);App.render()})}})}});
+  return m}
+App.route('campaigns',{title:'Розсилки',icon:'msg',nav:true,group:'growth',order:14,perm:'clients.*',render:function(v,params,q){
+  var db=App.db,list=(db.campaigns||[]).slice().sort(function(a,b){return (b.sentAt||'9')<(a.sentAt||'9')?-1:1}),cache={};
+  var lost=segInfo('lost','',cache);
+  App.setTop('<button class="btn pri d-only" data-act="sy-camp-new">'+ic('plus','s')+'Розсилка</button>');
+  App.actions['sy-camp-new']=function(){campForm()};
+  var sent=list.filter(function(c){return c.status==='sent'}),tot=U.sum(sent,function(c){return c.n||0}),bk=U.sum(sent,function(c){return c.booked||0});
+  var h='<div class="page narrow sy-page sy-camps"><div class="page-h"><div><h2>Розсилки</h2><p>Повідомлення групі клієнтів у Telegram, Viber або SMS. Кожен клієнт отримує не більше однієї розсилки на 30 днів.</p></div></div>';
+  if(!list.length)h+='<div class="card">'+UI.empty('msg','Розсилок ще не було','Нагадайте про себе тим, хто давно не приходив: '+lost.all.length+' '+U.plural(lost.all.length,'клієнт','клієнти','клієнтів')+' не були 45+ днів.','<button class="btn pri" data-sy="camp-new">'+ic('plus','s')+'Нова розсилка</button>')+'</div>';
+  else{
+   h+='<div class="kpis sy-kpis3"><div class="kpi"><div class="l">Розсилок</div><div class="v num">'+sent.length+'</div></div><div class="kpi"><div class="l">Надіслано повідомлень</div><div class="v num">'+U.fmt(tot)+'</div></div><div class="kpi"><div class="l">Записались після</div><div class="v num">'+bk+'</div><div class="d">'+(tot?Math.round(bk/tot*100):0)+'% від надісланих</div></div></div>';
+   h+='<div class="card sy-sugg"><div class="t"><b>Давно не були: '+lost.all.length+' '+U.plural(lost.all.length,'клієнт','клієнти','клієнтів')+'</b><small>Не приходили 45+ днів і не записані наперед'+(lost.all.length!==lost.rec.length?' · зараз можна написати '+lost.rec.length+', іншим уже писали цього місяця':'')+'</small></div><button class="btn" data-sy="camp-new" data-seg="lost">Написати їм</button></div>';
+   h+='<div class="list sy-cl">'+list.map(function(c){var sg=(SEGS.find(function(s){return s[0]===c.seg})||[0,c.seg])[1];
+    return '<div class="li sy-cr" data-id="'+c.id+'"><span class="sy-cic">'+ic(c.status==='sent'?'check':'edit')+'</span><span class="t"><b class="ell">'+esc(c.name||'Без назви')+'</b><small>'+esc(sg)+(c.seg==='tag'&&c.tag?' · '+esc(tagN(c.tag)):'')+' · '+(CH_N[c.ch]||c.ch)+'</small></span>'+
+     '<span class="sy-cst">'+(c.status==='sent'?'<b class="num">надіслано '+(c.n||0)+' · записались '+(c.booked||0)+'</b><small>'+D.human(c.sentAt.slice(0,10))+'</small>':'<span class="badge plain">Чернетка</span>')+'</span>'+
+     '<button class="icobtn ghost" data-sy="camp-menu" data-id="'+c.id+'" aria-label="Дії">'+ic('morev')+'</button></div>'}).join('')+'</div>';
+  }
+  h+='<button class="btn pri m-only sy-mcta" data-sy="camp-new">'+ic('plus','s')+'Нова розсилка</button></div>';
+  v.innerHTML=h;
+  v.onclick=function(e){var b=e.target.closest('[data-sy]');if(!b)return;var k=b.dataset.sy,c=(db.campaigns||[]).find(function(x){return x.id===b.dataset.id});
+   if(k==='camp-new')return campForm(b.dataset.seg?{name:'',seg:b.dataset.seg,tag:'',txt:segTpl(b.dataset.seg),ch:'tg'}:null);
+   if(k==='camp-menu'&&c)return UI.menu(b,[c.status==='sent'?{t:'Повторити',ic:'repeat',fn:function(){campForm({name:c.name,seg:c.seg,tag:c.tag||'',txt:c.txt,ch:c.ch==='auto'?'tg':c.ch})}}:{t:'Продовжити',ic:'edit',fn:function(){campForm(c)}},'-',
+     {t:'Видалити',ic:'trash',dng:true,fn:function(){UI.confirm({title:'Видалити «'+esc(c.name)+'»?',text:c.status==='sent'?'Повідомлення вже надіслані — зникне лише запис у цьому списку.':'Чернетку буде видалено.',ok:'Видалити',danger:true}).then(function(y){if(y){App.ops.remove('campaigns',c.id,'Видалено розсилку «'+c.name+'»');UI.toast('Розсилку видалено');App.render()}})}}])}}});
+
+/* онлайн-запис: посилання, QR, Instagram, макет сторінки */
+var TR={'а':'a','б':'b','в':'v','г':'h','ґ':'g','д':'d','е':'e','є':'ie','ж':'zh','з':'z','и':'y','і':'i','ї':'i','й':'i','к':'k','л':'l','м':'m','н':'n','о':'o','п':'p','р':'r','с':'s','т':'t','у':'u','ф':'f','х':'kh','ц':'ts','ч':'ch','ш':'sh','щ':'shch','ь':'','ю':'iu','я':'ia','ʼ':'',"'":''};
+function slug(s){return String(s||'').toLowerCase().split('').map(function(ch){return TR[ch]!=null?TR[ch]:/[a-z0-9]/.test(ch)?ch:'-'}).join('').replace(/-+/g,'-').replace(/^-|-$/g,'')}
+function qrSvg(str){var n=25,h=0,i;for(i=0;i<str.length;i++)h=(h*31+str.charCodeAt(i))>>>0;function rnd(){h^=h<<13;h>>>=0;h^=h>>17;h^=h<<5;h>>>=0;return h/4294967296}
+  var r='';function fin(x,y){return x<8&&y<8||x>=n-8&&y<8||x<8&&y>=n-8}
+  for(var y=0;y<n;y++)for(var x=0;x<n;x++){if(fin(x,y))continue;if(rnd()<.48)r+='<rect x="'+x+'" y="'+y+'" width="1" height="1"/>'}
+  [[0,0],[n-7,0],[0,n-7]].forEach(function(p){r+='<rect x="'+p[0]+'" y="'+p[1]+'" width="7" height="7"/><rect x="'+(p[0]+1)+'" y="'+(p[1]+1)+'" width="5" height="5" fill="#fff"/><rect x="'+(p[0]+2)+'" y="'+(p[1]+2)+'" width="3" height="3"/>'});
+  return '<svg class="sy-qr" viewBox="-2 -2 '+(n+4)+' '+(n+4)+'" role="img" aria-label="QR-код посилання"><rect x="-2" y="-2" width="'+(n+4)+'" height="'+(n+4)+'" fill="#fff"/><g fill="currentColor">'+r+'</g></svg>'}
+function copyTxt(t,msg){try{if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).catch(function(){})}catch(e){}UI.toast(msg||'Посилання скопійовано')}
+App.route('online',{title:'Онлайн-запис',icon:'link',nav:true,group:'growth',order:15,perm:'settings.*',permAlt:'services.view',render:function(v,params,q){
+  var db=App.db,edit=App.can('settings.manage'),base=gp('settings.booking.link')||'sola.slotly.ua',T0=T(),any=!!gp('settings.booking.allowAny');
+  var ms=App.masters(true),cnt={};db.appts.forEach(function(a){if(a.date>=D.add(T0,-89)&&a.date<=T0&&a.status==='done')(a.items||[]).forEach(function(x){cnt[x.svc]=(cnt[x.svc]||0)+1})});
+  var top=db.services.filter(function(s){return s.active!==false&&s.online!==false}).sort(function(a,b){return (cnt[b.id]||0)-(cnt[a.id]||0)}).slice(0,5);
+  function lrow(av,t,sub,url){return '<div class="li sy-lr">'+av+'<span class="t"><b class="ell">'+t+'</b><small class="ell">'+esc(url)+'</small></span><button class="icobtn ghost" data-sy="copy" data-u="'+esc(url)+'" aria-label="Копіювати посилання">'+ic('copy','s')+'</button></div>'}
   App.setTop('');
-  v.innerHTML='<div class="page sy-page sy-set'+(sec?' has-sec':'')+'"><div class="page-h sy-sh"><div><h2>Налаштування</h2><p>Салон «'+esc(App.db.salon.name)+'»</p></div></div><div class="sy-sgrid"><nav class="sy-snav" aria-label="Розділи налаштувань">'+
-   SECTIONS.map(function(s){return '<a class="sy-sn" href="#/settings/'+s.id+'" aria-current="'+(cur.id===s.id&&(sec||window.innerWidth>=900))+'">'+ic(s.ic)+'<span class="t"><b>'+s.t+'</b><small>'+s.d+'</small></span><span class="m-only">'+ic('right','s')+'</span></a>'}).join('')+'</nav>'+
-   '<section class="sy-sec"><div class="sy-sec-h"><a class="btn ghost m-only" href="#/settings" aria-label="Назад">'+ic('left')+'</a><h3>'+cur.t+'</h3></div><div class="sy-sec-b">'+cur.r()+'</div></section></div></div>';
+  var h='<div class="page sy-page sy-online"><div class="page-h"><div><h2>Онлайн-запис</h2><p>Посилання, за яким клієнти записуються самі — з Instagram, Google Maps чи месенджера.</p></div></div><div class="sy-ogrid"><div class="col-f g16">';
+  h+='<div class="card"><h3>Посилання салону</h3><div class="copyrow sy-copy"><code>'+esc(base)+'</code><button class="btn sm" data-sy="copy" data-u="'+esc(base)+'">'+ic('copy','s')+'Копіювати</button><button class="btn sm" data-sy="qr" data-u="'+esc(base)+'">QR</button></div>'+
+   '<div class="set-row" style="margin-top:6px"><div class="t"><b>«Будь-який майстер»</b><small>Клієнт може не обирати майстра — система підбере вільного</small></div><label class="sw"><input type="checkbox" data-sy="any"'+(any?' checked':'')+(edit?'':' disabled')+' aria-label="Будь-який майстер"><i></i></label></div>'+
+   '<div class="row g8 sy-olinks">'+(edit?'<a class="btn sm ghost" href="#/settings/booking">'+ic('cog','s')+'Правила запису</a>':'<span class="sy-hint" style="margin:0">Змінювати налаштування може власник.</span>')+'</div></div>';
+  h+='<div class="card flush"><div class="card-h"><b>Прямі посилання на майстрів</b><span class="sp"></span><span class="mute sy-sm">'+ms.length+'</span></div><div class="list">'+(ms.length?ms.map(function(m){return lrow(UI.av(m,'sm'),esc(m.short),'',base+'/'+slug(m.short))}).join(''):'<div class="sy-pad">'+UI.empty('users','Майстрів ще немає','Додайте майстрів у розділі «Команда».')+'</div>')+'</div></div>';
+  h+='<div class="card flush"><div class="card-h"><b>Популярні послуги</b><span class="sp"></span><span class="mute sy-sm">за 90 днів</span></div><div class="list">'+(top.length?top.map(function(s){return lrow('<span class="sy-cic">'+ic('scissors','s')+'</span>',esc(s.n),'',base+'/s/'+slug(s.n))}).join(''):'<div class="sy-pad">'+UI.empty('scissors','Послуг ще немає','Додайте послуги з онлайн-записом.')+'</div>')+'</div></div>';
+  h+='<div class="card sy-insta"><h3>Instagram: додайте кнопку «Записатися»</h3><ol><li>Профіль → <b>Редагувати профіль</b> → <b>Посилання</b> → додайте <code>'+esc(base)+'</code>.</li><li><b>Кнопки дій</b> → <b>Записатися</b> → вкажіть те саме посилання.</li><li>У сторіс додайте стікер «Посилання» з адресою конкретного майстра.</li></ol></div>';
+  h+='</div><aside class="sy-oprev"><div class="sy-phone" aria-label="Макет сторінки запису"><div class="sy-ph-top"><span class="sy-logo">'+esc(db.salon.logo||'SB')+'</span><b>'+esc(db.salon.name)+'</b><small>'+esc(db.salon.city||'Умань')+'</small></div>'+
+   '<div class="sy-ph-steps"><span aria-current="true">Послуга</span><span>Майстер</span><span>Час</span></div>'+
+   top.slice(0,3).map(function(s){return '<div class="sy-ph-s"><span class="t"><b class="ell">'+esc(s.n)+'</b><small>'+(s.dur||60)+' хв</small></span><b class="num">'+U.uah(s.price)+'</b></div>'}).join('')+
+   '<div class="sy-ph-m">'+(any?'<span class="sy-ph-any">'+ic('users','s')+'<small>Будь-який</small></span>':'')+ms.slice(0,3).map(function(m){return '<span>'+UI.av(m,'sm')+'<small class="ell">'+esc(m.short.split(' ')[0])+'</small></span>'}).join('')+'</div>'+
+   '<div class="sy-ph-t">'+['10:00','11:30','13:00','14:30','16:00','17:30'].map(function(t,i){return '<span'+(i===2?' aria-current="true"':'')+'>'+t+'</span>'}).join('')+'</div><div class="sy-ph-b">Записатися</div></div>'+
+   '<p class="sy-hint" style="text-align:center">Макет. Сама сторінка запису — окремий продукт Slotly.</p></aside></div></div>';
+  v.innerHTML=h;
+  v.onchange=function(e){if(e.target.dataset.sy==='any'){if(!edit){e.target.checked=any;return}App.ops.set('settings.booking.allowAny',e.target.checked,'«Будь-який майстер»: '+(e.target.checked?'увімкнено':'вимкнено'));UI.toast('Збережено');App.render()}};
+  v.onclick=function(e){var b=e.target.closest('[data-sy]');if(!b||b.tagName==='INPUT')return;var k=b.dataset.sy;
+   if(k==='copy')return copyTxt('https://'+b.dataset.u);
+   if(k==='qr')return UI.modal({title:'QR-код посилання',size:'narrow',body:'<div class="sy-qrw">'+qrSvg(b.dataset.u)+'<code>'+esc(b.dataset.u)+'</code><p class="sy-hint">Роздрукуйте й поставте на рецепції або дзеркалі. У демо — заглушка, справжній QR буде в робочій версії.</p></div>',foot:'<span class="sp"></span><button class="btn" data-x2>Закрити</button><button class="btn pri" data-qcopy>'+ic('copy','s')+'Копіювати посилання</button>',
+     onMount:function(el,cl){el.querySelector('[data-x2]').onclick=cl;el.querySelector('[data-qcopy]').onclick=function(){copyTxt('https://'+b.dataset.u);cl()}}})}}});
+
+var SGRP=[['salon','Салон'],['msg','Повідомлення'],['money','Гроші'],['team','Команда'],['sys','Система']];
+var SORD=['profile','booking','deposit','notify','noshow','telegram','forms','pay','accounting','payroll','roles','modules','alert','offline','data','plan'];
+App.route('settings',{title:'Налаштування',icon:'cog',nav:true,group:'sys',order:30,perm:'settings.manage',render:function(v,params,q){
+  var sid=params[0]==='reminders'?'notify':params[0],sec=SECTIONS.find(function(s){return s.id===sid}),cur=sec||SECTIONS[0];
+  App.setTop('');
+  function sn(s){return '<a class="sy-sn" href="#/settings/'+s.id+'" aria-current="'+(cur.id===s.id&&(!!sec||window.innerWidth>=900))+'">'+ic(s.ic)+'<span class="t"><b>'+s.t+'</b><small>'+s.d+'</small></span><span class="m-only">'+ic('right','s')+'</span></a>'}
+  var nav=SGRP.map(function(g){var L=SECTIONS.filter(function(s){return s.g===g[0]}).sort(function(x,y){return SORD.indexOf(x.id)-SORD.indexOf(y.id)});
+    var extra=g[0]==='sys'&&App.can('audit.view')?'<a class="sy-sn" href="#/audit">'+ic('log')+'<span class="t"><b>Журнал дій</b><small>Хто що змінив і коли</small></span><span class="m-only">'+ic('right','s')+'</span></a>':'';
+    return L.length?'<div class="sy-sg"><div class="sy-sgh">'+g[1]+'</div><div class="sy-sgl">'+L.map(sn).join('')+extra+'</div></div>':''}).join('');
+  v.innerHTML='<div class="page sy-page sy-set'+(sec?' has-sec':'')+'"><div class="page-h sy-sh"><div><h2>Налаштування</h2><p>Салон «'+esc(App.db.salon.name)+'» · кожна зміна зберігається одразу</p></div></div><div class="sy-sgrid"><nav class="sy-snav" aria-label="Розділи налаштувань">'+nav+'</nav>'+
+   '<section class="sy-sec" data-sec="'+cur.id+'"><div class="sy-sec-h"><a class="icobtn ghost m-only" href="#/settings" aria-label="Назад">'+ic('left')+'</a><div><h3>'+cur.t+'</h3><p class="mute">'+cur.d+'</p></div></div><div class="sy-sec-b">'+cur.r()+'</div></section></div></div>';
   function saved(){UI.toast('Збережено')}
   v.onchange=function(e){
     var el=e.target;
@@ -598,13 +689,14 @@ App.route('settings',{title:'Налаштування',icon:'cog',nav:true,group
       if(p==='salon.logo')val=String(val).toUpperCase().trim();
       if(p==='salon.name'&&!String(val).trim()){UI.toast('Назва не може бути порожньою',{type:'err'});return App.refresh()}
       App.ops.set(p,val,(el.dataset.l||'Налаштування')+': '+disp);saved();
-      if(p.indexOf('settings.modules.')===0||p.indexOf('salon.')===0||p==='settings.deposit.on'||p==='settings.alert.on'||p==='settings.alert.mode'||p==='settings.reminders.channel'||p.indexOf('settings.reminders.')===0||p.indexOf('settings.noshow.')===0)App.render();
+      if(p.indexOf('settings.modules.')===0||p.indexOf('salon.')===0||p==='settings.deposit.on'||p==='settings.alert.on'||p==='settings.alert.mode'||p==='settings.reminders.channel'||p.indexOf('settings.reminders.')===0||p.indexOf('settings.noshow.')===0||(p.indexOf('settings.notify.')===0&&p.indexOf('.tpl.')<0&&el.type==='checkbox')||p.indexOf('settings.telegram.')===0)App.render();
       return}
     var sy=el.dataset.sy;
     if(sy==='pay-on'){var m=App.db.pay.find(function(x){return x.id===el.dataset.id});
       if(!el.checked&&App.db.pay.filter(function(x){return x.on!==false}).length<=1){el.checked=true;return UI.toast('Має лишитись хоча б один активний спосіб',{type:'err'})}
       App.ops.upsert('pay',{id:m.id,on:el.checked},(el.checked?'Увімкнено':'Вимкнено')+' спосіб оплати: '+m.n);saved()}
     if(sy==='perm'){setPerm(el.dataset.role,el.dataset.perm,el.checked);saved();App.render()}};
+  v.oninput=function(e){var k=e.target.dataset.tplk;if(k){var pv=U.$('[data-prev="'+k+'"]',v);if(pv)pv.innerHTML=fillT(e.target.value)}};
   v.onclick=function(e){
     var b=e.target.closest('[data-sy]');if(!b||b.tagName==='INPUT')return;var k=b.dataset.sy;
     if(k==='pay-edit')return payModal(b.dataset.id);if(k==='pay-add')return payModal();
@@ -618,6 +710,13 @@ App.route('settings',{title:'Налаштування',icon:'cog',nav:true,group
     if(k==='exp-pays'){U.download('payments-'+T()+'.csv',csvPays(),'text/csv;charset=utf-8');return UI.toast('Платежі експортовано')}
     if(k==='imp')return importModal();
     if(k==='plan')return UI.toast('У демо тариф змінити не можна');
+    if(k==='rv-notify')return App.go('settings/notify');
+    if(k==='client')return App.openClient(b.dataset.id);
+    if(k==='casc'){var cs=(gp('settings.notify.cascade')||['tg','viber','sms']).slice(),i=+b.dataset.i,j=i+(+b.dataset.d);if(j<0||j>=cs.length)return;var t0=cs[i];cs[i]=cs[j];cs[j]=t0;
+      App.ops.set('settings.notify.cascade',cs,'Порядок каналів: '+cs.map(function(c){return CH_N[c]}).join(' → '));UI.toast('Порядок: '+cs.map(function(c){return CH_N[c]}).join(' → '));return App.render()}
+    if(k==='tg-sim'){var T0=T(),nm=D.nowMin(),ap=App.db.appts.filter(function(a){return a.client&&!a.clientOk&&(a.status==='new'||a.status==='confirmed')&&(a.date>T0||a.date===T0&&a.start>=nm)}).sort(function(x,y){return (x.date+String(x.start).padStart(4,'0'))<(y.date+String(y.start).padStart(4,'0'))?-1:1})[0];
+      if(!ap)return UI.toast('Немає записів, що чекають підтвердження');var cc=App.client(ap.client);App.ops.simReply(ap.id,'yes');UI.toast((cc?U.short(cc.n):'Клієнт')+' підтвердив(ла) запис на '+D.shortH(ap.date)+' '+U.hm(ap.start));return App.render()}
+    if(k==='form-send'){var fm=FORMS.find(function(f){return f[0]===b.dataset.k});copyTxt((gp('settings.booking.link')||'sola.slotly.ua')+'/f/'+b.dataset.k,'Посилання на анкету «'+(fm?fm[1]:'')+'» скопійовано');return}
     if(k==='reset')return UI.confirm({title:'Скинути демо-дані?',text:'Усі ваші зміни зникнуть, повернуться стартові клієнти та записи.',ok:'Скинути',danger:true}).then(function(y){if(y){App.reset();UI.toast('Демо скинуто до початкових даних')}})};
 }});
 })();

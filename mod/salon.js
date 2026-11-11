@@ -530,6 +530,7 @@ function tabPay(box,s){
        fld('Чайові майстру',suf('tipsPct',pay.tipsPct!=null?pay.tipsPct:100,'%',canEdit?'':'disabled'),'100% = всі чайові майстру')+'</div></div>'+
      (pay.type!=='fixed'?'<div class="card" style="margin-top:12px"><h3>Особливі відсотки за послугами <span class="sp"></span>'+(canEdit?'<button class="btn sm" data-a="addsvc">'+ic('plus','s')+'Послуга</button>':'')+'</h3>'+
        (svcs.length?'<div class="sl-list">'+svcs.map(function(id){var sv=App.svc(id);return '<div class="li"><span class="t"><b>'+esc(sv?sv.n:id)+'</b><small>замість '+pc(basePct)+'</small></span><div class="inp-suf sm"><input data-f="svc" data-id="'+id+'" inputmode="decimal" value="'+pay.svc[id]+'"'+(canEdit?'':' disabled')+'><span>%</span></div>'+(canEdit?'<button class="icobtn ghost sm" data-a="rmsvc" data-id="'+id+'" aria-label="Прибрати">'+ic('x','s')+'</button>':'')+'</div>'}).join('')+'</div>':'<div class="mute" style="font-size:13px">Немає. Для всіх послуг діє відсоток вище. Додайте виняток, напр. 50% з хімічних процедур.</div>')+'</div>':'')+
+     '<div class="card" style="margin-top:12px"><h3>Продаж сертифікатів і абонементів</h3><div class="sumrow"><span>Із продажу сертифікатів</span><b class="num">'+pc(db.settings.payroll.certSalePct||0)+'</b></div><div class="sumrow"><span>Із продажу абонементів</span><b class="num">'+pc(db.settings.payroll.abonSalePct||0)+'</b></div><p class="sl-hint" style="margin:8px 0 0">Спільні для всіх співробітників. '+(App.can('settings.manage')?'<a href="#/settings/payroll">Змінити в налаштуваннях</a>':'Змінює власник у налаштуваннях.')+'</p></div>'+
      '<div class="card" style="margin-top:12px"><h3>Приклад розрахунку</h3><div data-ex></div></div>'+
      (canEdit?'<div class="row" style="margin-top:14px"><span class="sp"></span><button class="btn" data-a="reset">Скасувати</button><button class="btn pri" data-a="save">Зберегти</button></div>':'')}
   function example(){var ex=db.services.find(function(x){return performs(s,x)})||db.services[0];if(!ex)return;var price=App.priceFor(ex,s);
@@ -696,7 +697,7 @@ function renderSchedules(v,params,q){
   /* панель вибору */
   h+='<div class="sl-selbar" data-selbar hidden><b data-sn></b><span class="sp"></span><button class="btn sm" data-a="sel-clear">Скасувати</button><button class="btn pri sm" data-a="sel-apply">Змінити вибране</button></div>';
   var pg=page(v,'sl-schedules wide',h);
-  App.setTop(edit?'<button class="btn pri" data-act="sl-to-new">'+ic('plus')+'<span class="sl-lbl">Відпустка</span></button>':'');
+  App.setTop(edit?'<button class="icobtn" data-act="sl-sch-more" aria-label="Ще дії">'+ic('morev')+'</button><button class="btn pri" data-act="sl-to-new">'+ic('plus')+'<span class="sl-lbl">Відпустка</span></button>':'');
   /* вибір */
   var sel={},anchor=null,pickMode=false,dragging=false,moved=false;
   function selKeys(){return Object.keys(sel)}
@@ -738,6 +739,22 @@ function renderSchedules(v,params,q){
   });
 }
 App.actions['sl-to-new']=function(){timeoffModal(null,{staff:(App.parse().q||{}).staff})};
+App.actions['sl-sch-more']=function(e){var b=e.target.closest('[data-act]');UI.menu(b,[{t:'Лікарняний на сьогодні',ic:'alert',fn:function(){sickToday((App.parse().q||{}).staff)}},{t:'Відпустка або відгул',ic:'plus',fn:function(){timeoffModal(null,{staff:(App.parse().q||{}).staff})}}])};
+/* «Лікарняний на сьогодні» (SYSTEM §4.12): одна дія — день закрито, далі розібрати записи */
+function sickToday(stId){var T=App.today(),ms=App.masters().filter(function(s){return s.week});if(!ms.length)return UI.toast('Немає майстрів із графіком',{type:'err'});
+  var cur=App.staff(stId)&&App.staff(stId).week?stId:(ms.find(function(s){return apptsInRange(s.id,T,T).length})||ms[0]).id;
+  function list(id){var ap=apptsInRange(id,T,T);return ap.length?'<div class="sl-list sl-sick">'+ap.map(function(a){var c=App.client(a.client);return '<div class="li" data-id="'+a.id+'"><span class="t"><b class="num">'+U.hm(a.start)+' · '+esc(c?c.n:'Без імені')+'</b><small class="ell">'+esc(App.apptTitle(a))+'</small></span><button class="btn sm" data-sk="move" data-id="'+a.id+'">Перенести</button><button class="btn sm dng" data-sk="cancel" data-id="'+a.id+'">Скасувати</button></div>'}).join('')+'</div>':UI.empty('cal','Записів на сьогодні немає','Можна просто закрити день — клієнтів повідомляти не треба.')}
+  UI.modal({title:'Лікарняний на сьогодні',size:'narrow',body:'<div class="col-f g12">'+fld('Майстер',sel('staff',ms.map(function(s){return [s.id,s.short]}),cur))+'<p class="sl-hint" style="margin:0">'+D.human(T)+'. Онлайн-запис до майстра закриється, записи нижче треба перенести або скасувати з повідомленням клієнту.</p><div data-sl></div></div>',
+   foot:modalFoot('','Закрити день'),onMount:function(el,cl){var box=el.querySelector('[data-sl]');function draw(){box.innerHTML=list(gv(el,'staff'))}draw();
+    el.addEventListener('change',function(e){if(e.target.name==='staff')draw()});
+    box.addEventListener('click',function(e){var b=e.target.closest('[data-sk]');if(!b)return;var a=App.appt(b.dataset.id);if(!a)return;var c=App.client(a.client);
+     if(b.dataset.sk==='move'){cl();return App.moveAppt(a.id)}
+     UI.confirm({title:'Скасувати запис о '+U.hm(a.start)+'?',text:(c?esc(c.n)+' отримає повідомлення про скасування.':'Клієнта не вказано.'),ok:'Скасувати й повідомити',danger:true}).then(function(y){if(!y)return;
+      O.setStatus(a.id,'cancelled',{reason:'Майстер на лікарняному'});if(c&&(c.tg||c.ph))O.sendMsg({client:c.id,appt:a.id,tpl:'cancel',txt:'Вибачте, майстер захворів. Запис скасовано — напишіть, підберемо інший час.'});UI.toast('Запис скасовано'+(c&&(c.tg||c.ph)?', клієнта повідомлено':''));draw()})});
+    el.querySelector('[data-ok]').onclick=function(){var id=gv(el,'staff'),s=App.staff(id),ov=App.db.timeoff.some(function(x){return x.staff===id&&x.from<=T&&x.to>=T});
+     if(!ov)O.upsert('timeoff',{staff:id,kind:'sick',from:T,to:T,note:'Лікарняний'},'Лікарняний на сьогодні: '+s.short);
+     var n=apptsInRange(id,T,T).length;cl();UI.toast('Лікарняний: '+s.short+(n?'. Ще не розібрано записів: '+n:''),n?{type:'ok',ms:4500}:undefined);App.refresh()}}})}
+App.sickToday=sickToday;
 
 function apptsInRange(stId,from,to){return App.db.appts.filter(function(a){return a.staff===stId&&a.date>=from&&a.date<=to&&(a.status==='new'||a.status==='confirmed'||a.status==='arrived')}).sort(function(a,b){return a.date===b.date?a.start-b.start:a.date<b.date?-1:1})}
 function apptsListHtml(list,max){if(!list.length)return '';max=max||8;
@@ -920,7 +937,7 @@ function renderProducts(v,params,q){
      '<div class="row" style="margin-top:14px"><span class="mute" data-isum></span><span class="sp"></span><button class="btn" data-a="inv-clear">Очистити</button><button class="btn pri" data-a="inv-apply" disabled>Застосувати</button></div>';
   }
   var pg=page(v,'sl-products',h);
-  App.setTop((canManage()?'<button class="btn" data-act="sl-receive">'+ic('down','s')+'<span class="sl-lbl">Надходження</span></button><button class="btn" data-act="sl-writeoff">'+ic('minus','s')+'<span class="sl-lbl">Списання</span></button>':'')+(canSell()?'<button class="btn pri" data-act="sl-sell">'+ic('receipt','s')+'<span class="sl-lbl">Продаж</span></button>':'')+(canManage()?'<button class="btn" data-act="sl-prod-new" aria-label="Новий товар">'+ic('plus','s')+'<span class="sl-lbl">Товар</span></button>':''));
+  App.setTop((canManage()?'<button class="icobtn m-only" data-act="sl-prod-more" aria-label="Ще дії">'+ic('morev')+'</button>':'')+(canManage()?'<button class="btn d-only" data-act="sl-receive">'+ic('down','s')+'<span class="sl-lbl">Надходження</span></button><button class="btn" data-act="sl-writeoff">'+ic('minus','s')+'<span class="sl-lbl">Списання</span></button>':'')+(canSell()?'<button class="btn pri" data-act="sl-sell">'+ic('receipt','s')+'<span class="sl-lbl">Продаж</span></button>':'')+(canManage()?'<button class="btn d-only" data-act="sl-prod-new" aria-label="Новий товар">'+ic('plus','s')+'<span class="sl-lbl">Товар</span></button>':''));
   var qi=$('[data-q]',pg);if(qi)qi.oninput=U.debounce(function(){qset({q:qi.value||null});var pos=qi.selectionStart;renderProducts(v,params,App.parse().q);var n=$('[data-q]',v);n.focus();try{n.setSelectionRange(pos,pos)}catch(e){}},180);
   chg(pg,{mp:function(t){App.setQ({p:t.value||null},true)},mr:function(t){App.setQ({r:t.value||null},true)}});
   act(pg,{tab:function(t){App.setQ({tab:t.dataset.k==='cat'?null:t.dataset.k,q:null,cat:null,low:null,arch:null,p:null,r:null,n:null},true)},
@@ -940,7 +957,7 @@ function renderProducts(v,params,q){
         if(!ch.length)return;UI.confirm({title:'Застосувати інвентаризацію?',text:'Буде скориговано '+ch.length+' '+U.plural(ch.length,'позицію','позиції','позицій')+': '+ch.slice(0,4).map(function(c){return esc(c.p.n)+' '+(c.d>0?'+':'−')+Math.abs(c.d)}).join(', ')+(ch.length>4?'…':'')+'.',ok:'Застосувати'}).then(function(y){if(!y)return;
           ch.forEach(function(c){O.stockEx(c.p.id,c.d,'inv',{note:'Інвентаризація '+D.shortH(App.today())})});UI.toast('Залишки скориговано: '+ch.length);App.refresh()})}})}
 }
-App.actions['sl-receive']=function(){receiveModal()};App.actions['sl-writeoff']=function(){writeoffModal()};App.actions['sl-sell']=function(){sellProduct()};App.actions['sl-prod-new']=function(){productForm()};
+App.actions['sl-receive']=function(){receiveModal()};App.actions['sl-prod-more']=function(e){UI.menu(e.target.closest('[data-act]'),[{t:'Надходження',ic:'down',fn:function(){receiveModal()}},{t:'Списання',ic:'minus',fn:function(){writeoffModal()}},'-',{t:'Новий товар',ic:'plus',fn:function(){App.actions['sl-prod-new']()}}])};App.actions['sl-writeoff']=function(){writeoffModal()};App.actions['sl-sell']=function(){sellProduct()};App.actions['sl-prod-new']=function(){productForm()};
 
 function productForm(id){var db=App.db,p=id?db.products.find(function(x){return x.id===id}):null,isNew=!p;
   if(!canManage())return UI.toast('Недостатньо прав',{type:'err'});

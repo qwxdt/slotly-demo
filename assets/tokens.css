@@ -38,11 +38,24 @@
   --font:Onest,system-ui,-apple-system,"Segoe UI",sans-serif; --font-d:Onest,system-ui,sans-serif;
   /* шкала текста */
   --t-xs:12px; --t-sm:13px; --t-md:15px; --t-lg:17px; --t-xl:22px; --t-2xl:28px; --t-3xl:40px;
+  /* ── v2 (DESIGN-V2 §1, B1): тільки додаємо, старі імена не чіпаємо ── */
+  --focus:var(--accent);
+  --overlay:rgba(18,18,20,.32);
+  --hover-row:#FAFAFB;
+  --danger-soft:var(--st-noshow); --warn-soft:var(--st-here); --ok-soft:var(--st-ok);
+  --sh-3:0 24px 64px -16px rgba(18,18,20,.35);
+  --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px; --s-5:20px; --s-6:24px; --s-8:32px; --s-10:40px; --s-12:48px;
+  --t-base:14px;
+  --h-ctl:36px; --h-ctl-sm:32px; --h-row:44px; --h-li:48px; --top:56px; --tab:64px;
+}
+@media (max-width:899px){
+  :root{--h-ctl:44px; --h-ctl-sm:36px; --h-li:56px; --top:52px;
+    --t-base:15px; --t-md:16px; --t-xl:20px; --t-2xl:24px; --t-3xl:32px}
 }
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;font-family:var(--font);font-size:var(--t-md);line-height:1.45;color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased;font-feature-settings:"ss01" 0}
 .num{font-variant-numeric:tabular-nums}
 button{font:inherit;color:inherit}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}

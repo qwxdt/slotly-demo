@@ -1,10 +1,10 @@
 <!doctype html>
 <html lang="uk">
 <head>
-<meta charset="utf-8">
 <meta name="robots" content="noindex,nofollow">
+<meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#ffffff">
+<meta name="theme-color" content="#F7F7F8">
 <title>Slotly — адмінка салону</title>
 <link rel="stylesheet" href="assets/tokens.css">
 <link rel="stylesheet" href="app.css">
@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="mod/money.css">
 <link rel="stylesheet" href="mod/salon.css">
 <link rel="stylesheet" href="mod/system.css">
+<link rel="stylesheet" href="mod/shell.css">
 </head>
 <body>
 <div class="app">
@@ -27,12 +28,15 @@
   <main class="main">
     <div id="banners"></div>
     <header class="top">
-      <button class="icobtn ghost m-only" data-act="salon" aria-label="Салон" style="margin-left:-6px;font-weight:700;font-size:12px">SB</button>
+      <button id="top-back" class="icobtn ghost" aria-label="Назад" hidden><svg class="i"><use href="#i-left"/></svg></button>
+      <button class="icobtn ghost m-only top-salon" data-act="salon" aria-label="Салон">SB</button>
       <h1 id="ttl"></h1>
+      <button class="gsearch" data-act="search"><svg class="i"><use href="#i-search"/></svg><span>Пошук</span><kbd>Ctrl K</kbd></button>
       <div class="top-actions">
         <div id="top-x" class="row"></div>
-        <button class="gsearch" data-act="search"><svg class="i"><use href="#i-search"/></svg><span>Пошук</span><kbd>Ctrl K</kbd></button>
+        <div id="top-new"></div>
         <button class="icobtn m-only" data-act="search" aria-label="Пошук"><svg class="i"><use href="#i-search"/></svg></button>
+        <button id="bell" class="icobtn" data-act="bell" aria-label="Сповіщення"><svg class="i"><use href="#i-bell"/></svg><span class="dot" hidden></span></button>
       </div>
     </header>
     <div class="view" id="view"></div>
@@ -48,6 +52,7 @@
 <script src="mod/money.js"></script>
 <script src="mod/salon.js"></script>
 <script src="mod/system.js"></script>
+<script src="mod/shell.js"></script>
 <script>App.boot()</script>
 </body>
 </html>

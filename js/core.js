@@ -208,7 +208,8 @@ function seed(){
    {id:'m3',n:'Христина Шевчук',role:'master',lvl:'jr',spec:'Брови та вії',ph:'380671234503',cats:['brow']},
    {id:'m4',n:'Дарина Мельник',role:'master',lvl:'top',spec:'Перукар-колорист',ph:'380671234504',cats:['hair'],res:'r3'},
    {id:'m5',n:'Віталій Бондаренко',role:'master',lvl:'mid',spec:'Барбер',ph:'380671234505',cats:['barber'],res:'r4'},
-   {id:'m6',n:'Ірина Ткач',role:'master',lvl:'mid',spec:'Косметолог',ph:'380671234506',cats:['cosm'],res:'r5'}
+   {id:'m6',n:'Ірина Ткач',role:'master',lvl:'mid',spec:'Косметолог',ph:'380671234506',cats:['cosm'],res:'r5'},
+   {id:'s2',n:'Оксана Гнатюк',role:'accountant',lvl:null,spec:'Бухгалтер',ph:'380931114455',works:false,pay:{type:'fixed',fixed:9000,pct:0}}
   ];
   /* шаблон тижня: wd1 0..6 → [start,end] або null; перерва */
   var tpl={m1:[[540,1140],[540,1140],null,[540,1140],[540,1140],[600,1020],null],
@@ -344,7 +345,7 @@ function seed(){
    {id:'t1',t:'Замовити гель-лаки (закінчуються нюдові)',due:T,who:'s1',done:false,prio:'high',by:'s0'},
    {id:'t2',t:'Передзвонити Вікторії щодо перенесення',due:T,who:'s1',done:false,prio:'mid',by:'s1'},
    {id:'t3',t:'Оновити ціни на фарбування',due:D.add(T,3),who:'s0',done:false,prio:'mid',by:'s0'},
-   {id:'t4',t:'Повірити касу за вчора',due:D.add(T,-1),who:'s1',done:true,prio:'low',by:'s0'},
+   {id:'t4',t:'Перевірити касу за вчора',due:D.add(T,-1),who:'s1',done:true,prio:'low',by:'s0'},
    {id:'t5',t:'Записати Дарину на курс AirTouch',due:D.add(T,10),who:'s0',done:false,prio:'low',by:'s0'},
    {id:'t6',t:'Помити стерилізатор',due:T,who:'m1',done:false,prio:'low',by:'s1'}
   ];
@@ -369,12 +370,64 @@ function seed(){
     if(D.wd1(d)===5&&bal>5000){var amt=Math.floor((bal-3000)/1000)*1000;db.cashOps.push({id:'co'+(++seq),date:d,type:'out',amount:amt,note:'Інкасація у сейф',by:'s0'});bal-=amt}
   });
   var y=D.add(T,-1);db.dayClose[y]={counted:bal-50,expected:bal,diff:-50,note:'Не вистачає 50 ₴ — розбираємось',by:'s1',ts:y+'T20:10'};
+  App.migrate(db);seedExtra(db);
   return db;
+}
+/* ───────── міграція (B1): ідемпотентна, db.v лишається 1 ───────── */
+var TPL={confirm:'{імʼя}, ви записані в {салон}: {послуга}, {дата} о {час}, майстер {майстер}. Підтвердіть, будь ласка: Так / Перенести / Скасувати.',
+  h24:'{імʼя}, нагадуємо: завтра о {час} — {послуга} у {салон}. Чекаємо! Якщо плани змінились: {посилання}',
+  h2:'{імʼя}, за 2 години чекаємо вас у {салон}: {послуга} о {час}.',
+  move:'{імʼя}, ваш запис перенесено: {послуга}, {дата} о {час}, майстер {майстер}.',
+  cancel:'{імʼя}, ваш запис на {дата} о {час} скасовано. Записатися знову: {посилання}',
+  review:'{імʼя}, дякуємо за візит! Оцініть, будь ласка, {майстер}: {посилання}',
+  ret:'{імʼя}, давно не бачились. Запишіться до {майстер} у зручний час: {посилання}',
+  wait:'{імʼя}, звільнилось місце: {послуга}, {дата} о {час}. Записати вас? Так / Ні'};
+App.TPL=TPL;
+App.migrate=function(db){
+  db.notifs=db.notifs||[];db.photos=db.photos||[];db.msgs=db.msgs||[];db.campaigns=db.campaigns||[];
+  db.waitlist=db.waitlist||[];db.waitlist.forEach(function(w){w.status=w.status||'wait'});
+  var st=db.settings;st.access=st.access||{hidePhones:false,masterPay:true,masterBook:true};
+  st.payroll=st.payroll||{};if(st.payroll.certSalePct==null)st.payroll.certSalePct=5;if(st.payroll.abonSalePct==null)st.payroll.abonSalePct=5;
+  var r=st.reminders||{};
+  st.notify=st.notify||{confirm:true,h24:r.h24!==false,h2:r.h2!==false,review:r.afterVisit!==false,reviewDelayH:3,returnDays:r.returnDays||28,quietFrom:'21:00',quietTo:'09:00',cascade:['tg','viber','sms'],team:true,tpl:Object.assign({},TPL)};
+  st.telegram=st.telegram||{bot:'@sola_beauty_bot',clientBot:true,teamBot:true,connected:true};
+  st.booking=st.booking||{};st.booking.link=st.booking.link||'sola.slotly.ua';
+  if(!db.staff.some(function(s){return s.role==='accountant'}))db.staff.push({id:'s2',n:'Оксана Гнатюк',role:'accountant',lvl:null,spec:'Бухгалтер',ph:'380931114455',works:false,pay:{type:'fixed',fixed:9000,pct:0},short:'Оксана Г.',ini:'ОГ',c:db.staff.length%8,active:true,since:D.add(App.today(),-400),week:null,tg:true});
+  return db};
+/* демо-наповнення нових колекцій (тільки якщо порожні) */
+function seedExtra(db){
+  var T=App.today(),Y=D.add(T,-1),Tm=D.add(T,1);
+  var cl=function(id){return db.clients.find(function(c){return c.id===id})||db.clients[0]};
+  var ap=function(f){return db.appts.filter(f)};
+  if(!db.notifs.length){
+    var on=ap(function(a){return a.date>=T&&a.src==='online'&&a.status!=='cancelled'})[0];
+    var mv=ap(function(a){return a.date===Tm&&a.status==='confirmed'})[1];
+    var cn=ap(function(a){return a.date>=T&&a.status==='cancelled'})[0];
+    var ln=function(a){return a?U.short(cl(a.client).n)+', '+(D.diff(T,a.date)===0?'сьогодні':D.diff(T,a.date)===1?'завтра':D.shortH(a.date))+' '+U.hm(a.start):''};
+    var nn=[
+     [T+'T'+'09:12','appt.new','Нова онлайн-запис: '+(on?ln(on):'Марія К., завтра 14:00'),on?'appt:'+on.id:'calendar',on?on.staff:'all',false],
+     [T+'T'+'08:40','appt.move','Перенесено запис: '+(mv?ln(mv):'Олена Т.'),mv?'appt:'+mv.id:'calendar','all',false],
+     [T+'T'+'08:05','review','Новий відгук 5★ від '+U.short(cl('c12').n),'reviews','all',false],
+     [Y+'T'+'20:30','day','Вчора: розбіжність каси −50 ₴','cash','all',true],
+     [Y+'T'+'18:15','appt.cancel','Скасовано запис: '+(cn?ln(cn):'Ірина С., завтра 11:00'),cn?'appt:'+cn.id:'calendar','all',true],
+     [Y+'T'+'16:02','stock','Закінчується: Маска для волосся Olaplex №8 (1 шт.)','products','all',true],
+     [Y+'T'+'13:47','wait','Звільнилось вікно завтра о 15:00 · 2 чекають','waitlist','all',true],
+     [Y+'T'+'11:20','pay','Оплата 1 300 ₴ карткою: '+U.short(cl('c4').n),'cash','all',true]];
+    db.notifs=nn.map(function(x,i){return {id:'n'+(i+1),ts:x[0],kind:x[1],txt:x[2],ref:x[3],to:x[4],read:x[5]}});
+  }
+  if(!db.photos.length)db.photos=[['before',-40],['after',-40],['before',-12],['after',-12]].map(function(x,i){return {id:'ph'+(i+1),client:'c4',appt:null,kind:x[0],date:D.add(T,x[1]),by:'m1',src:''}});
+  if(!db.msgs.length){var tm=ap(function(a){return a.date===Tm&&a.status!=='cancelled'&&a.client}).slice(0,8),td=ap(function(a){return a.date===T&&a.status!=='cancelled'&&a.client}).slice(0,4);
+    tm.forEach(function(a,i){var c=cl(a.client);db.msgs.push({id:'ms'+(i+1),ts:T+'T10:'+String(i*4).padStart(2,'0'),client:a.client,appt:a.id,ch:c.tg?'tg':'viber',tpl:'h24',txt:'Нагадування за 24 години',status:i<3?'read':'delivered',reply:i<3?'Так':''})});
+    td.forEach(function(a,i){var c=cl(a.client);db.msgs.push({id:'ms'+(20+i),ts:Y+'T10:'+String(i*5).padStart(2,'0'),client:a.client,appt:a.id,ch:c.tg?'tg':'sms',tpl:'h24',txt:'Нагадування за 24 години',status:'read',reply:i%2?'':'Так'})});
+    tm.slice(0,3).forEach(function(a){a.clientOk=true});}
+  if(!db.campaigns.length)db.campaigns=[{id:'cp1',name:'Повернення 45+ днів',seg:'lost',tpl:'ret',txt:TPL.ret,ch:'tg',status:'sent',sentAt:D.add(T,-6)+'T11:00',n:18,booked:3},
+    {id:'cp2',name:'Знижка до дня народження',seg:'bd',tpl:'ret',txt:'{імʼя}, з наближенням дня народження! Даруємо −10% на будь-яку послугу до кінця місяця: {посилання}',ch:'tg',status:'draft',sentAt:'',n:0,booked:0}];
+  ['m1','m3','s1'].forEach(function(id,i){if(db.certs[i]&&!db.certs[i].soldBy)db.certs[i].soldBy=id});['m1','m4'].forEach(function(id,i){if(db.abons[i]&&!db.abons[i].soldBy)db.abons[i].soldBy=id});
 }
 
 /* ───────── сховище ───────── */
 App.load=function(){
-  try{var s=localStorage.getItem(KEY);if(s){var db=JSON.parse(s);if(db&&db.v===1){App.db=db;return}}}catch(e){}
+  try{var s=localStorage.getItem(KEY);if(s){var db=JSON.parse(s);if(db&&db.v===1){App.db=db;App.migrate(db);return}}}catch(e){}
   App.db=seed();App.save(true);
 };
 App.save=function(silent){try{localStorage.setItem(KEY,JSON.stringify(App.db))}catch(e){console.warn('save failed',e)}if(!silent)App.emit('change')};
@@ -441,6 +494,36 @@ App.clientSegment=function(c,st){st=st||App.clientStats(c.id);var T=App.today();
   if(c.blocked)return 'blocked';if(st.visits===0)return 'new';if(st.visits<=1&&D.diff(st.first,T)<45)return 'new';
   if(st.daysSince!=null&&st.daysSince>60)return 'lost';if(st.visits>=5||c.tags.indexOf('vip')>=0)return 'regular';return 'active'};
 App.SEG={new:'Нові',active:'Активні',regular:'Постійні',lost:'Давно не були',blocked:'Чорний список'};
+/* ───────── B1: нові селектори ───────── */
+App.performs=function(st,sv){if(!st||!sv)return false;if(st.svcs)return st.svcs.indexOf(sv.id)>=0;return (st.cats||[]).indexOf(sv.cat)>=0};
+App.nextFree=function(svcId,o){o=o||{};var sv=App.svc(svcId);if(!sv)return [];var n=o.n||5,T=App.today(),from=o.from&&o.from>T?o.from:T,now=D.nowMin(),res=[];
+  var ms=o.staff?[App.staff(o.staff)].filter(Boolean):App.masters().filter(function(m){return App.performs(m,sv)});
+  for(var i=0;i<14&&res.length<n;i++){var d=D.add(from,i);var day=[];
+    ms.forEach(function(m){App.freeSlots(m.id,d,sv.d+(sv.buffer||0)).forEach(function(t){if(d===T&&t<=now)return;day.push({staff:m.id,date:d,start:t})})});
+    day.sort(function(a,b){return a.start-b.start});
+    for(var j=0;j<day.length&&res.length<n;j++)res.push(day[j])}
+  return res};
+App.waitMatches=function(staffId,date,start,dur){var m=App.staff(staffId);return (App.db.waitlist||[]).filter(function(w){if((w.status||'wait')!=='wait')return false;
+  if(date<w.from||date>w.to)return false;if(w.staff)return w.staff===staffId;return App.performs(m,App.svc(w.svc))})};
+App.clientDebt=function(cid){var T=App.today();return U.sum(App.db.appts.filter(function(a){return a.client===cid&&a.status==='done'&&a.date<=T}),function(a){return App.apptDue(a)})};
+App.apptRisks=function(a){var r=[];if(!a||!a.client)return r;var c=App.client(a.client);if(!c)return r;var st=App.clientStats(c.id),T=App.today();
+  if(st.visits===0)r.push({k:'new',t:'Новий клієнт'});
+  if(a.status==='new'){var mins=D.diff(T,a.date)*1440+a.start-D.nowMin();if(mins<1440)r.push({k:'unconf',t:'Не підтвердив(ла)'})}
+  var debt=App.clientDebt(c.id);if(debt>0)r.push({k:'debt',t:'Борг '+U.uah(debt)});
+  if(st.noshow>=2)r.push({k:'late',t:st.noshow+' '+U.plural(st.noshow,'неявка','неявки','неявок')});
+  if(c.tags.indexOf('allergy')>=0||/алерг/i.test(c.note||''))r.push({k:'allergy',t:'Алергія'});
+  return r.slice(0,3)};
+App.canSeePhone=function(role){role=role||App.me().role;return !(role==='master'&&App.db.settings.access&&App.db.settings.access.hidePhones)};
+App.phoneOf=function(c,role){if(!c||!c.ph)return '';if(!App.canSeePhone(role))return '';return U.phone(c.ph)};
+App.dayStatus=function(date){var db=App.db,now=D.nowMin(),T=App.today();var as=App.apptsOn(date).filter(function(a){return a.status!=='cancelled'&&!a.block});
+  var paid=function(a){return App.apptPaid(a)>=App.apptTotal(a)&&App.apptTotal(a)>0};
+  var past=function(a){return date<T||(date===T&&a.start<=now)};
+  var m=App.money(date,date);var done=as.filter(function(a){return a.status==='done'});
+  return {visits:as.length,done:done.length,unpaid:as.filter(function(a){return a.status==='arrived'&&!paid(a)}).map(function(a){return a.id}),
+    open:as.filter(function(a){return (a.status==='new'||a.status==='confirmed')&&past(a)}).map(function(a){return a.id}),
+    noshow:as.filter(function(a){return a.status==='noshow'}).map(function(a){return a.id}),
+    expected:App.cashBalance(date),closed:!!db.dayClose[date],revenue:m.revenue,avg:m.avgCheck,tips:m.tips,byMethod:m.byMethod}};
+App.unread=function(staffId){staffId=staffId||App.db.meId;return (App.db.notifs||[]).filter(function(n){return !n.read&&(n.to==='all'||n.to===staffId)})};
 
 /* ───────── фінанси: розрахунки ───────── */
 /* виторг за період: послуги (оплачені), продажі товарів, продаж сертифікатів/абонементів, чайові окремо */
@@ -486,9 +569,13 @@ App.payroll=function(staffId,from,to){
       var share=g?x.price/g:0;var base=acc.basis==='afterDiscount'?x.price-disc*share:x.price;
       var p=cfg.svc&&cfg.svc[x.svc]!=null?cfg.svc[x.svc]:basePct;
       var e=cfg.type==='fixed'?0:base*p/100;
-      svcSum+=base;earn+=e;lines.push({appt:a.id,date:a.date,svc:x.svc,base:Math.round(base),pct:p,earn:Math.round(e),client:a.client});
+      svcSum+=base;earn+=e;lines.push({kind:'svc',appt:a.id,date:a.date,svc:x.svc,base:Math.round(base),pct:p,earn:Math.round(e),client:a.client});
     });
   });
+  /* F66: % продавцю за сертифікати й абонементи */
+  var cP=acc.certSalePct!=null?acc.certSalePct:5,aP=acc.abonSalePct!=null?acc.abonSalePct:5,sale=0;
+  (db.certs||[]).forEach(function(g){if(g.soldBy===staffId&&g.sold>=from&&g.sold<=to){var e2=Math.round(g.nominal*cP/100);sale+=e2;lines.push({kind:'sale',t:'Сертифікат '+g.code,appt:null,date:g.sold,svc:null,base:g.nominal,pct:cP,earn:e2,client:null})}});
+  (db.abons||[]).forEach(function(g){if(g.soldBy===staffId&&g.sold>=from&&g.sold<=to){var t2=(db.abonTypes||[]).find(function(x){return x.id===g.type});var e3=Math.round((g.price||0)*aP/100);sale+=e3;lines.push({kind:'sale',t:'Абонемент '+(t2?'«'+t2.n+'»':''),appt:null,date:g.sold,svc:null,base:g.price||0,pct:aP,earn:e3,client:g.client||null})}});
   var tips=U.sum(db.payments.filter(function(p){return p.kind==='tip'&&p.staff===staffId&&p.date>=from&&p.date<=to}),function(p){return p.amount})*(cfg.tipsPct!=null?cfg.tipsPct:100)/100;
   var prod=U.sum(db.payments.filter(function(p){return p.kind==='product'&&p.staff===staffId&&p.date>=from&&p.date<=to}),function(p){return p.amount});
   var prodEarn=prod*(cfg.productPct||0)/100;
@@ -497,8 +584,8 @@ App.payroll=function(staffId,from,to){
   var bonus=U.sum(adj.filter(function(p){return p.type==='bonus'}),function(p){return p.amount});
   var fine=U.sum(adj.filter(function(p){return p.type==='fine'}),function(p){return p.amount});
   var paid=U.sum(adj.filter(function(p){return p.type==='salary'||p.type==='advance'}),function(p){return p.amount});
-  var total=Math.round(earn+tips+prodEarn+fixed+bonus-fine);
-  return {staff:staffId,from:from,to:to,visits:done.length,svcSum:Math.round(svcSum),svcEarn:Math.round(earn),tips:Math.round(tips),prod:Math.round(prod),prodEarn:Math.round(prodEarn),fixed:fixed,bonus:bonus,fine:fine,total:total,paid:paid,left:total-paid,pct:basePct,lines:lines}};
+  var total=Math.round(earn+sale+tips+prodEarn+fixed+bonus-fine);
+  return {staff:staffId,from:from,to:to,visits:done.length,svcSum:Math.round(svcSum),svcEarn:Math.round(earn),tips:Math.round(tips),prod:Math.round(prod),prodEarn:Math.round(prodEarn),saleEarn:sale,fixed:fixed,bonus:bonus,fine:fine,total:total,paid:paid,left:total-paid,pct:basePct,lines:lines}};
 App.payPeriod=function(date){date=date||App.today();var p=App.db.settings.payroll.period;
   if(p==='month')return {from:D.monthStart(date),to:D.monthEnd(date)};
   if(p==='week'){var w=D.weekStart(date);return {from:w,to:D.add(w,6)}}
@@ -512,16 +599,24 @@ var O=App.ops={};
 O.createAppt=function(o){
   var a={id:U.uid('a'),staff:o.staff,date:o.date,start:o.start,items:o.items,client:o.client||null,status:o.status||'confirmed',src:o.src||'admin',note:o.note||'',deposit:o.deposit||0,discount:null,created:App.today()+'T'+U.hm(D.nowMin()),events:[],res:o.res||null,extra:o.extra||0};
   ev(a,'Створено ('+(App.SRC[a.src]||a.src)+')');App.db.appts.push(a);
-  var c=App.client(a.client);log('create','appt:'+a.id,'Новий запис: '+(c?c.n:'без імені')+', '+D.shortH(a.date)+' '+U.hm(a.start));App.save();return a};
+  var c=App.client(a.client);log('create','appt:'+a.id,'Новий запис: '+(c?c.n:'без імені')+', '+D.shortH(a.date)+' '+U.hm(a.start));App.save();
+  if(App.db.settings.offline)setTimeout(function(){UI.toast('Збережено на пристрої — синхронізуємо, щойно зʼявиться звʼязок')},400);
+  if(!a.block&&(App.db.meId!==a.staff||a.src==='online'))O.notify('appt.new',(a.src==='online'?'Нова онлайн-запис: ':'Новий запис: ')+(c?U.short(c.n):'без імені')+', '+D.shortH(a.date)+' '+U.hm(a.start),'appt:'+a.id,a.staff);
+  return a};
 O.updateAppt=function(id,patch,why){var a=App.appt(id);if(!a)return;var old={staff:a.staff,date:a.date,start:a.start};Object.assign(a,patch);
   var moved=patch.date!==undefined&&patch.date!==old.date||patch.start!==undefined&&patch.start!==old.start||patch.staff!==undefined&&patch.staff!==old.staff;
   var txt=why||(moved?'Перенесено з '+D.shortH(old.date)+' '+U.hm(old.start)+(old.staff!==a.staff?' ('+App.staff(old.staff).short+')':'')+' на '+D.shortH(a.date)+' '+U.hm(a.start)+(old.staff!==a.staff?' ('+App.staff(a.staff).short+')':''):'Змінено');
-  ev(a,txt);log(moved?'move':'edit','appt:'+id,txt);App.save();return a};
+  ev(a,txt);log(moved?'move':'edit','appt:'+id,txt);App.save();
+  if(moved)O.notify('appt.move',(App.client(a.client)?U.short(App.client(a.client).n)+': ':'')+txt,'appt:'+id,'all');
+  return a};
 O.setStatus=function(id,st,extra){var a=App.appt(id);if(!a)return;var prev=a.status;a.status=st;extra=extra||{};
   if(st==='arrived')a.arrivedAt=App.today()+'T'+U.hm(D.nowMin());
   if(st==='cancelled'){a.cancelReason=extra.reason||'';a.lateCancel=!!extra.late}
   ev(a,'Статус: '+App.ST[prev].n+' → '+App.ST[st].n+(extra.reason?' ('+extra.reason+')':''));
-  log('status','appt:'+id,(App.client(a.client)||{n:'—'}).n+': '+App.ST[st].n);App.save();return a};
+  log('status','appt:'+id,(App.client(a.client)||{n:'—'}).n+': '+App.ST[st].n);App.save();
+  if(st==='cancelled'&&prev!=='cancelled'){var cc=App.client(a.client);O.notify('appt.cancel','Скасовано запис: '+(cc?U.short(cc.n):'без імені')+', '+D.shortH(a.date)+' '+U.hm(a.start),'appt:'+id,'all');
+    var wm=App.waitMatches(a.staff,a.date,a.start,App.apptDur(a));if(wm.length)O.notify('wait','Звільнилось '+D.shortH(a.date)+' о '+U.hm(a.start)+' · '+wm.length+' '+U.plural(wm.length,'чекає','чекають','чекають'),'waitlist','all')}
+  return a};
 O.deleteAppt=function(id){var i=App.db.appts.findIndex(function(a){return a.id===id});if(i<0)return;var a=App.db.appts.splice(i,1)[0];App.db.payments=App.db.payments.filter(function(p){return p.appt!==id});log('delete','appt:'+id,'Видалено запис '+D.shortH(a.date)+' '+U.hm(a.start));App.save();return a};
 /* оплата: lines=[{method,amount}] + {tips:[{method,amount}], cert:{id,amount}, abon:{id}, products:[{id,qty}], discount} */
 O.checkout=function(id,o){
@@ -550,7 +645,7 @@ O.deleteClient=function(id){var c=App.client(id);App.db.clients=App.db.clients.f
 O.addExpense=function(e){e.id=U.uid('e');e.by=App.db.meId;e.date=e.date||App.today();App.db.expenses.push(e);log('create','exp:'+e.id,'Витрата: '+e.note+' '+U.uah(e.amount));App.save();return e};
 O.deleteExpense=function(id){var e=App.db.expenses.find(function(x){return x.id===id});App.db.expenses=App.db.expenses.filter(function(x){return x.id!==id});log('delete','exp:'+id,'Видалено витрату '+(e?U.uah(e.amount):''));App.save();return e};
 O.cashOp=function(o){o.id=U.uid('co');o.by=App.db.meId;o.date=o.date||App.today();App.db.cashOps.push(o);log('cash','cash:'+o.id,(o.type==='in'?'Внесення ':'Вилучення ')+U.uah(o.amount)+' — '+o.note);App.save();return o};
-O.closeDay=function(date,counted,note){var exp=App.cashBalance(date);App.db.dayClose[date]={counted:counted,expected:exp,diff:counted-exp,note:note||'',by:App.db.meId,ts:App.today()+'T'+U.hm(D.nowMin())};log('close','day:'+date,'Закриття дня: розбіжність '+U.uah(counted-exp));App.save()};
+O.closeDay=function(date,counted,note){var exp=App.cashBalance(date);App.db.dayClose[date]={counted:counted,expected:exp,diff:counted-exp,note:note||'',by:App.db.meId,ts:App.today()+'T'+U.hm(D.nowMin())};log('close','day:'+date,'Закриття дня: розбіжність '+U.uah(counted-exp));App.save();O.notify('day','День закрито: розбіжність '+U.uah(counted-exp),'cash','all')};
 O.payout=function(o){o.id=U.uid('po');o.by=App.db.meId;o.date=o.date||App.today();App.db.payouts.push(o);var s=App.staff(o.staff);log('payout','staff:'+o.staff,({salary:'Виплата',advance:'Аванс',bonus:'Премія',fine:'Штраф'}[o.type])+' '+s.short+' '+U.uah(o.amount));App.save();return o};
 O.sellCert=function(o){var db=App.db;var g={id:U.uid('g'),code:'SB-'+(5000+db.certs.length*137%4999),nominal:o.nominal,balance:o.nominal,buyer:o.buyer||null,recipient:o.recipient||'',sold:App.today(),expires:D.add(App.today(),o.days||180),status:'active',note:o.note||'',method:o.method};
   db.certs.push(g);db.payments.push({id:U.uid('p'),cert:g.id,appt:null,date:App.today(),ts:App.today()+'T'+U.hm(D.nowMin()),method:o.method,amount:o.nominal,kind:'cert_sale',staff:null,by:db.meId});log('create','cert:'+g.id,'Продано сертифікат '+g.code+' на '+U.uah(o.nominal));App.save();return g};
@@ -562,6 +657,26 @@ O.stock=function(id,qty,reason,cost){var pr=App.db.products.find(function(x){ret
   if(qty>0&&cost)App.db.expenses.push({id:U.uid('e'),date:App.today(),cat:'mat',amount:cost,note:'Закупівля: '+pr.n+' ×'+qty,method:'iban',by:App.db.meId});log('stock','prod:'+id,(qty>0?'Надходження ':'Списання ')+pr.n+' '+qty);App.save()};
 O.set=function(path,val,txt){var o=App.db,p=path.split('.');for(var i=0;i<p.length-1;i++){o[p[i]]=o[p[i]]||{};o=o[p[i]]}o[p[p.length-1]]=val;log('settings',path,txt||'Змінено налаштування');App.save()};
 O.upsert=function(coll,obj,txt){var arr=App.db[coll];if(obj.id){var x=arr.find(function(y){return y.id===obj.id});if(x){Object.assign(x,obj);log('edit',coll+':'+obj.id,txt||'Змінено');App.save();return x}}else obj.id=U.uid(coll.slice(0,2));arr.push(obj);log('create',coll+':'+obj.id,txt||'Додано');App.save();return obj};
+/* B1: нові операції */
+O.notify=function(kind,txt,ref,to){var db=App.db;db.notifs=db.notifs||[];var n={id:U.uid('n'),ts:App.today()+'T'+U.hm(D.nowMin()).padStart(5,'0'),kind:kind,txt:txt,ref:ref||'',to:to||'all',read:false};db.notifs.unshift(n);if(db.notifs.length>200)db.notifs.length=200;log('notify',ref||'',txt);App.save();return n};
+O.readNotifs=function(ids){(App.db.notifs||[]).forEach(function(n){if(ids==='all'||(ids||[]).indexOf(n.id)>=0)n.read=true});App.save(true)};
+O.sendMsg=function(o){var c=App.client(o.client)||{};var ch=o.ch||(c.tg?'tg':c.ph?'viber':'sms');var m={id:U.uid('ms'),ts:App.today()+'T'+U.hm(D.nowMin()).padStart(5,'0'),client:o.client||null,appt:o.appt||null,ch:ch,tpl:o.tpl||'',txt:o.txt||'',status:'delivered',reply:''};
+  (App.db.msgs=App.db.msgs||[]).push(m);log('msg','client:'+(o.client||''),'Повідомлення ('+ch+'): '+(c.n||''));App.save();return m};
+O.simReply=function(apptId,ans){var a=App.appt(apptId);if(!a)return;var db=App.db,c=App.client(a.client)||{n:'Клієнт'};
+  var m=(db.msgs||[]).filter(function(x){return x.appt===apptId}).pop();if(m)m.reply=ans==='yes'?'Так':ans==='no'?'Скасувати':'Перенести';
+  if(ans==='yes'){a.clientOk=true;if(a.status==='new')O.setStatus(apptId,'confirmed');else{log('edit','appt:'+apptId,c.n+' підтвердив(ла)');App.save()}}
+  else if(ans==='no'){O.setStatus(apptId,'cancelled',{reason:'Клієнт скасував у месенджері'})}
+  else O.notify('appt.move','Клієнт просить перенести: '+U.short(c.n)+', '+D.shortH(a.date)+' '+U.hm(a.start),'appt:'+apptId,a.staff);
+  return a};
+O.addPhoto=function(o){var db=App.db;db.photos=db.photos||[];if(db.photos.filter(function(x){return x.client===o.client}).length>=30)return false;
+  var ph={id:U.uid('ph'),client:o.client,appt:o.appt||null,kind:o.kind||'after',date:o.date||App.today(),by:App.db.meId,src:o.src||''};db.photos.push(ph);log('create','photo:'+ph.id,'Додано фото клієнта');App.save();return ph};
+O.delPhoto=function(id){App.db.photos=(App.db.photos||[]).filter(function(x){return x.id!==id});log('delete','photo:'+id,'Видалено фото');App.save()};
+O.waitAdd=function(o){var w=Object.assign({id:U.uid('w')},o,{status:'wait',created:App.today()});(App.db.waitlist=App.db.waitlist||[]).push(w);var c=App.client(w.client);log('create','wait:'+w.id,'У лист очікування: '+(c?c.n:''));App.save();return w};
+O.waitSet=function(id,st){var w=(App.db.waitlist||[]).find(function(x){return x.id===id});if(!w)return;w.status=st;log('edit','wait:'+id,'Лист очікування: '+st);App.save();return w};
+O.campaign=function(o){var db=App.db;db.campaigns=db.campaigns||[];var x=o.id&&db.campaigns.find(function(c){return c.id===o.id});
+  if(x)Object.assign(x,o);else{x=Object.assign({id:U.uid('cp'),status:'draft',sentAt:'',n:0,booked:0},o);db.campaigns.push(x)}log('edit','campaign:'+x.id,'Розсилка «'+(x.name||'')+'»');App.save();return x};
+O.sendCampaign=function(id,ids){var x=(App.db.campaigns||[]).find(function(c){return c.id===id});if(!x)return;(ids||[]).forEach(function(cid){O.sendMsg({client:cid,tpl:x.tpl,txt:x.txt,ch:x.ch==='auto'?null:x.ch})});
+  x.status='sent';x.sentAt=App.today()+'T'+U.hm(D.nowMin()).padStart(5,'0');x.n=(ids||[]).length;log('send','campaign:'+id,'Розсилку надіслано: '+x.n);App.save();return x};
 O.remove=function(coll,id,txt){App.db[coll]=App.db[coll].filter(function(x){return x.id!==id});log('delete',coll+':'+id,txt||'Видалено');App.save()};
 
 /* ───────── UI-хелпери ───────── */
@@ -580,6 +695,12 @@ UI.modal=function(o){var ov=document.createElement('div');ov.className='ov'+(o.d
   ov.addEventListener('mousedown',function(e){if(e.target===ov)c()});
   ov.querySelector('[data-x]').onclick=c;
   var f=ov.querySelector('input:not([type=hidden]),select,textarea');if(f&&!o.noFocus&&window.innerWidth>899)setTimeout(function(){f.focus()},30);
+  /* B1: свайп униз по листу на телефоні */
+  var box=ov.firstChild,g=document.createElement('div');g.className='sheet-grip';box.insertBefore(g,box.firstChild);
+  var y0=null,dy=0;g.addEventListener('touchstart',function(e){if(window.innerWidth>899)return;y0=e.touches[0].clientY;dy=0;box.style.transition='none'},{passive:true});
+  g.addEventListener('touchmove',function(e){if(y0==null)return;dy=Math.max(0,e.touches[0].clientY-y0);box.style.transform='translateY('+dy+'px)'},{passive:true});
+  g.addEventListener('touchend',function(){if(y0==null)return;y0=null;box.style.transition='transform .2s var(--ease)';
+    if(dy>80){if(box.querySelector('[data-dirty]')){box.style.transform='';UI.confirm({title:'Закрити без збереження?',ok:'Закрити',danger:true}).then(function(y){if(y)c()})}else c()}else box.style.transform=''});
   if(o.onMount)o.onMount(ov.firstChild,c);return {el:ov.firstChild,close:c}};
 UI.drawer=function(o){o.drawer=true;return UI.modal(o)};
 UI.closeAll=function(){openStack.slice().forEach(close)};
@@ -639,6 +760,7 @@ App.setQ=function(patch,replace){var r=App.parse();var q=Object.assign({},r.q,pa
 App.cur=null;
 App.render=function(){
   var r=App.parse(),rt=ROUTES[r.id]||ROUTES.home;if(!rt)return;
+  if(r.q.as&&App.staff(r.q.as)&&App.db.meId!==r.q.as){App.db.meId=r.q.as;App.save(true)}
   if(rt.perm&&!App.can(rt.perm)&&!(rt.permAlt&&App.can(rt.permAlt))){rt=ROUTES.denied||rt}
   App.cur={rt:rt,r:r};
   renderShell(rt,r);
@@ -649,33 +771,62 @@ App.render=function(){
 };
 /* перемалювати поточний екран без скролу нагору */
 App.refresh=function(){if(!App.cur)return;App._keepScroll=App.cur.rt.id;var v=U.$('#view'),st=v.scrollTop;App.render();v.scrollTop=st};
-App.setTop=function(html){var t=U.$('#top-x');if(t)t.innerHTML=html||''};
+App.setTop=function(html){var t=U.$('#top-x');if(t)t.innerHTML=html||'';
+  /* B1: якщо екран сам дає «Новий запис» (календар до B2), глобальну кнопку ховаємо — без дубля */
+  var tn=U.$('#top-new');if(tn)tn.style.display=/data-act="(cal-new|hm-new)"/.test(html||'')?'none':''};
 
-var GROUPS=[['work','Робота'],['money','Гроші'],['salon','Салон'],['sys','Система']];
-function navItems(){var role=App.me().role;return Object.keys(ROUTES).map(function(k){return ROUTES[k]}).filter(function(r){return r.nav&&(!r.perm||App.can(r.perm)||(r.permAlt&&App.can(r.permAlt)))&&(!r.module||App.db.settings.modules[r.module])}).sort(function(a,b){return (a.order||99)-(b.order||99)})}
+var GROUPS=[['work',''],['money','Гроші'],['salon','Салон'],['growth','Зростання'],['sys','']];
+App.NAV_HIDE=['audit'];
+App.TOP_NEW_HIDE=['cash','payroll','settings','audit'];
+function canRoute(x){return x&&(!x.perm||App.can(x.perm)||(x.permAlt&&App.can(x.permAlt)))&&(!x.module||App.db.settings.modules[x.module])}
+function navItems(){return Object.keys(ROUTES).map(function(k){return ROUTES[k]}).filter(function(r){return r.nav&&App.NAV_HIDE.indexOf(r.id)<0&&canRoute(r)}).sort(function(a,b){return (a.order||99)-(b.order||99)})}
+/* вкладки таббару за роллю (DESIGN-V2 §6.1); null = центральна «+» */
+App.tabsFor=function(role){
+  if(role==='master')return [['home','home','Мій день'],['calendar','cal','Календар'],null,['payroll','coins','Заробіток'],['more','menu','Ще']];
+  if(role==='accountant')return [['home','home','Сьогодні'],['cash','wallet','Каса'],['reports','chart','Звіти'],['more','menu','Ще']];
+  return [['home','home','Сьогодні'],['calendar','cal','Календар'],null,['clients','users','Клієнти'],['more','menu','Ще']]};
+App.canNew=function(rt){var me=App.me(),acc=App.db.settings.access||{};if(rt&&(rt.noNew||App.TOP_NEW_HIDE.indexOf(rt.id)>=0||App.TOP_NEW_HIDE.indexOf(rt.parent)>=0))return false;
+  if(!(App.can('calendar.all')||App.can('calendar.own')))return false;if(me.role==='master'&&acc.masterBook===false)return false;return true};
+var MASTER_LBL={home:'Мій день',payroll:'Мій заробіток'};
+function navLink(it,rt){var c=it.count?it.count():'',lb=(App.me().role==='master'&&MASTER_LBL[it.id])||it.title;return '<a href="#/'+it.id+'" '+(it.id===rt.id||(rt.parent===it.id)?'aria-current="page"':'')+'>'+App.icon(it.icon)+'<span>'+lb+'</span>'+(c?'<span class="cnt'+(it.countDot?' dot':'')+'">'+c+'</span>':'')+'</a>'}
+function bannerFor(db,me){var L=[];
+  if(db.settings.offline)L.push('<div class="banner off" role="status">'+App.icon('wifioff')+'<span><b>Немає інтернету.</b> Записи зберігаються на пристрої й синхронізуються, щойно зʼявиться звʼязок.</span><span class="sp"></span><button class="btn sm" data-act="online">Звʼязок є</button></div>');
+  if(db.settings.alert.on)L.push('<div class="banner air" role="status">'+App.icon('siren')+'<span><b>Повітряна тривога · '+U.esc(db.settings.alert.region)+'.</b> '+(db.settings.alert.mode==='pause'?'Онлайн-запис на найближчу годину призупинено.':'Клієнтам надіслано повідомлення про можливу затримку.')+'</span><span class="sp"></span><button class="btn sm" data-act="alert-off">Відбій</button></div>');
+  var y=D.add(App.today(),-1);
+  if(['owner','admin','accountant'].indexOf(me.role)>=0&&!db.dayClose[y]&&App.apptsOn(y).some(function(a){return a.status==='done'}))L.push('<div class="banner warn" role="status">'+App.icon('alert')+'<span><b>Вчора не закрито день.</b> Звірте касу, щоб зарплати й звіти були точні.</span><span class="sp"></span><a class="btn sm" href="#/cash/close">Закрити день</a></div>');
+  if(!L.length)return '';return L[0].replace('</div>',(L.length>1?'<span class="banner-more">ще '+(L.length-1)+'</span>':'')+'</div>')}
 function renderShell(rt,r){
-  var db=App.db,me=App.me(),items=navItems(),side='';
-  GROUPS.forEach(function(g){var its=items.filter(function(x){return (x.group||'work')===g[0]});if(!its.length)return;side+='<div class="grp">'+g[1]+'</div>';
-    its.forEach(function(it){var c=it.count?it.count():'';side+='<a href="#/'+it.id+'" '+(it.id===rt.id||(rt.parent===it.id)?'aria-current="page"':'')+'>'+App.icon(it.icon)+'<span>'+it.title+'</span>'+(c?'<span class="cnt'+(it.countDot?' dot':'')+'">'+c+'</span>':'')+'</a>'})});
-  U.$('#nav').innerHTML=side;
+  var db=App.db,me=App.me(),items=navItems(),side='',sys='';
+  GROUPS.forEach(function(g){var its=items.filter(function(x){return (x.group||'work')===g[0]});if(!its.length)return;
+    var h=(g[1]?'<div class="grp">'+g[1]+'</div>':'')+its.map(function(it){return navLink(it,rt)}).join('');
+    if(g[0]==='sys')sys=h;else side+='<div class="nav-g">'+h+'</div>'});
+  U.$('#nav').innerHTML=side+(sys?'<div class="nav-sys">'+sys+'</div>':'');
   U.$('#salon-sw').innerHTML='<span class="mono">'+U.esc(db.salon.logo)+'</span><span class="t" style="min-width:0;flex:1;text-align:left"><b class="ell">'+U.esc(db.salon.name)+'</b><small class="ell">'+U.esc(db.salon.city+', '+db.salon.addr)+'</small></span>'+App.icon('down','s');
   U.$('#me').innerHTML=UI.av(me,'sm')+'<span style="min-width:0;flex:1;text-align:left"><b class="ell">'+U.esc(me.n)+'</b><small>'+App.ROLES[me.role].n+'</small></span>'+App.icon('morev','s');
-  var ttl=U.$('#ttl');ttl.innerHTML=U.esc(rt.title||'');
-  /* банери */
-  var b='';if(db.settings.offline)b+='<div class="banner off">'+App.icon('wifioff')+'<span><b>Немає звʼязку.</b> Працюєте з локальною копією — зміни синхронізуються, щойно зʼявиться інтернет.</span><span class="sp"></span><button class="btn sm" data-act="online">Звʼязок є</button></div>';
-  if(db.settings.alert.on)b+='<div class="banner air">'+App.icon('siren')+'<span><b>Повітряна тривога · '+U.esc(db.settings.alert.region)+'.</b> '+(db.settings.alert.mode==='pause'?'Онлайн-запис на найближчу годину призупинено.':'Клієнтам надіслано повідомлення про можливу затримку.')+'</span><span class="sp"></span><button class="btn sm" data-act="alert-off">Відбій</button></div>';
-  U.$('#banners').innerHTML=b;
+  document.body.setAttribute('data-route',rt.id);
+  var ttl=U.$('#ttl');ttl.innerHTML=U.esc((me.role==='master'&&MASTER_LBL[rt.id])||rt.title||'');
+  /* назад */
+  var bk=U.$('#top-back');if(bk){var par=rt.back||rt.parent||(r.params.length?rt.id:'');bk.hidden=!(r.params.length>0||rt.back||rt.parent);bk.onclick=function(){App.go(par||'home')}}
+  /* глобальна «+ Новий запис» */
+  var tn=U.$('#top-new');if(tn)tn.innerHTML=App.canNew(rt)?'<div class="split"><button class="btn pri" data-act="new-appt">'+App.icon('plus')+'<span>Новий запис</span></button><button class="btn pri split-more" data-act="create" aria-label="Інші дії">'+App.icon('down','s')+'</button></div>':'';
+  /* дзвіночок */
+  var bd=U.$('#bell .dot');if(bd)bd.hidden=!App.unread(me.id).length;
+  /* банер: один за пріоритетом */
+  U.$('#banners').innerHTML=bannerFor(db,me);
   /* tabbar */
-  var tabs=[['home','home','Сьогодні'],['calendar','cal','Календар'],['clients','users','Клієнти'],['cash','wallet','Каса'],['more','menu','Ще']].filter(function(t){var x=ROUTES[t[0]];return t[0]==='more'||(x&&(!x.perm||App.can(x.perm)||(x.permAlt&&App.can(x.permAlt))))});
-  if(me.role==='master')tabs=[['home','home','Сьогодні'],['calendar','cal','Календар'],['payroll','coins','Заробіток'],['schedules','grid','Графік'],['more','menu','Ще']];
-  U.$('#tabbar').style.gridTemplateColumns='repeat('+tabs.length+',1fr)';
-  U.$('#tabbar').innerHTML=tabs.map(function(t){var cur=t[0]===rt.id||(t[0]==='more'&&tabs.every(function(x){return x[0]!==rt.id&&x[0]!==rt.parent}));return '<a href="#/'+t[0]+'" '+(cur?'aria-current="page"':'')+'>'+App.icon(t[1])+'<span>'+t[2]+'</span></a>'}).join('');
+  var tabs=App.tabsFor(me.role).filter(function(t){return t===null?App.canNew(null):(t[0]==='more'||canRoute(ROUTES[t[0]]))});
+  U.$('#tabbar').style.gridTemplateColumns='repeat('+tabs.length+',minmax(0,1fr))';
+  var ids=tabs.filter(Boolean).map(function(t){return t[0]});
+  U.$('#tabbar').innerHTML=tabs.map(function(t){if(t===null)return '<button class="tab-plus" data-act="create" aria-label="Створити">'+App.icon('plus')+'</button>';
+    var cur=t[0]===rt.id||t[0]===rt.parent||(t[0]==='more'&&ids.indexOf(rt.id)<0&&ids.indexOf(rt.parent)<0);return '<a href="#/'+t[0]+'" '+(cur?'aria-current="page"':'')+'>'+App.icon(t[1])+'<span>'+t[2]+'</span></a>'}).join('');
 }
 App.navItems=navItems;App.GROUPS=GROUPS;
+/* B1: модулі/права/сповіщення змінились → оновити меню, дзвіночок, таббар без перерендеру екрана */
+var _shT;App.on('change',function(){clearTimeout(_shT);_shT=setTimeout(function(){if(App.cur)try{renderShell(App.cur.rt,App.cur.r)}catch(e){console.error(e)}},0)});
 
 /* «Ще» (мобільний) */
-App.route('more',{title:'Меню',render:function(v){var items=navItems();var h='<div class="page"><div class="list" style="margin-bottom:16px"><button class="li" data-act="me">'+UI.av(App.me())+'<span class="t"><b>'+U.esc(App.me().n)+'</b><small>'+App.ROLES[App.me().role].n+' · '+U.esc(App.db.salon.name)+'</small></span>'+App.icon('right','s')+'</button></div>';
-  GROUPS.forEach(function(g){var its=items.filter(function(x){return (x.group||'work')===g[0]});if(!its.length)return;h+='<div class="nav" style="margin:0 0 6px"><div class="grp" style="padding-left:4px">'+g[1]+'</div></div><div class="list" style="margin-bottom:16px">'+its.map(function(it){return '<a class="li" href="#/'+it.id+'" style="text-decoration:none">'+App.icon(it.icon,'l')+'<span class="t"><b>'+it.title+'</b></span>'+App.icon('right','s')+'</a>'}).join('')+'</div>'});
+App.route('more',{title:'Ще',render:function(v){var inTab=App.tabsFor(App.me().role).filter(Boolean).map(function(t){return t[0]});var items=navItems().filter(function(x){return inTab.indexOf(x.id)<0});var h='<div class="page"><div class="list" style="margin-bottom:16px"><button class="li" data-act="me">'+UI.av(App.me())+'<span class="t"><b>'+U.esc(App.me().n)+'</b><small>'+App.ROLES[App.me().role].n+' · '+U.esc(App.db.salon.name)+'</small></span>'+App.icon('right','s')+'</button></div>';
+  GROUPS.forEach(function(g){var its=items.filter(function(x){return (x.group||'work')===g[0]});if(!its.length)return;h+=(g[1]?'<div class="more-grp">'+g[1]+'</div>':'')+'<div class="list" style="margin-bottom:16px">'+its.map(function(it){return '<a class="li" href="#/'+it.id+'" style="text-decoration:none">'+App.icon(it.icon,'l')+'<span class="t"><b>'+it.title+'</b></span>'+App.icon('right','s')+'</a>'}).join('')+'</div>'});
   v.innerHTML=h+'</div>'}});
 App.route('denied',{title:'Немає доступу',render:function(v){v.innerHTML='<div class="page">'+UI.empty('lock','Цей розділ недоступний для вашої ролі','Попросіть власника салону відкрити доступ у Налаштування → Ролі.','<a class="btn" href="#/home" style="margin-top:8px">На головну</a>')+'</div>'}});
 
@@ -683,20 +834,22 @@ App.route('denied',{title:'Немає доступу',render:function(v){v.inner
 App.actions={
   online:function(){App.ops.set('settings.offline',false,'Звʼязок відновлено');UI.toast('Синхронізовано 3 зміни');App.render()},
   'alert-off':function(){App.ops.set('settings.alert.on',false,'Відбій тривоги');UI.toast('Відбій. Онлайн-запис знову працює');App.render()},
+  'new-appt':function(){App.newAppt({})},
   me:function(e){var el=e&&e.target.closest('[data-act]')||U.$('#me');
-    UI.menu(el,[{t:'Увійти як: Власник',ic:'key',fn:function(){App.switchRole('s0')}},{t:'Увійти як: Адміністратор',ic:'user',fn:function(){App.switchRole('s1')}},{t:'Увійти як: Майстер (Олена)',ic:'scissors',fn:function(){App.switchRole('m1')}},'-',
+    UI.menu(el,[{t:'Змінити роль (демо): Власник',ic:'key',fn:function(){App.switchRole('s0')}},{t:'Змінити роль: Адміністратор',ic:'user',fn:function(){App.switchRole('s1')}},{t:'Змінити роль: Майстер (Олена)',ic:'scissors',fn:function(){App.switchRole('m1')}},{t:'Змінити роль: Бухгалтер',ic:'coins',fn:function(){App.switchRole('s2')}},'-',
       {t:App.db.settings.offline?'Увімкнути звʼязок':'Симулювати: немає інтернету',ic:'wifioff',fn:function(){App.ops.set('settings.offline',!App.db.settings.offline);App.render()}},
       {t:App.db.settings.alert.on?'Відбій тривоги':'Симулювати: повітряна тривога',ic:'siren',fn:function(){App.ops.set('settings.alert.on',!App.db.settings.alert.on);App.render()}},'-',
+      {t:'Підтримка',ic:'msg',fn:function(){UI.toast('Підтримка в Telegram — у робочій версії')}},'-',
       {t:'Скинути демо-дані',ic:'undo',dng:true,fn:function(){UI.confirm({title:'Скинути демо?',text:'Усі ваші зміни зникнуть, дані повернуться до початкових.',ok:'Скинути',danger:true}).then(function(y){if(y){App.reset();UI.toast('Демо скинуто')}})}}])},
-  salon:function(e){UI.menu(e.target.closest('[data-act]'),[{t:'Sola Beauty · Умань',ic:'check'},{t:'Додати філію',ic:'plus',fn:function(){UI.toast('Філії — у тарифі «Мережа»')}}])},
+  salon:function(e){UI.menu(e.target.closest('[data-act]'),[{t:App.db.salon.name+' · '+App.db.salon.city,ic:'check'},{t:'Додати філію',ic:'plus',fn:function(){UI.toast('Філії — у тарифі «Мережа»')}}])},
   search:function(){App.cmdk&&App.cmdk()}
 };
 /* міжмодульні точки входу — модулі ПЕРЕВИЗНАЧАЮТЬ ці заглушки */
-['openAppt','newAppt','checkout','openClient','sellCert','sellAbon','sellProduct','addExpense','openStaff','openService','cmdk'].forEach(function(k){App[k]=function(){UI.toast('Модуль ще в роботі: '+k,{type:'err'})}});
+['openAppt','newAppt','checkout','openClient','sellCert','sellAbon','sellProduct','addExpense','openStaff','openService','cmdk','bell','waitNew','moveAppt','closeDayWizard'].forEach(function(k){App[k]=function(){UI.toast('Модуль ще в роботі: '+k,{type:'err'})}});
 App.switchRole=function(id){App.db.meId=id;App.save(true);var s=App.staff(id);UI.toast('Ви увійшли як '+App.ROLES[s.role].n.toLowerCase()+' — '+s.short);App.go('home')};
 document.addEventListener('click',function(e){var a=e.target.closest('[data-act]');if(a&&App.actions[a.dataset.act]){e.preventDefault();App.actions[a.dataset.act](e)}});
 document.addEventListener('keydown',function(e){
-  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();App.cmdk&&App.cmdk()}
+  if((e.metaKey||e.ctrlKey)&&(e.code==='KeyK'||e.key.toLowerCase()==='k')){e.preventDefault();App.cmdk&&App.cmdk()}
   if(e.key==='Escape'){if(UI._menu)return UI.closeMenu();var top=openStack[openStack.length-1];if(top)close(top)}
 });
 

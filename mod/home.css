@@ -93,11 +93,106 @@
   .hm-att{flex-wrap:wrap;row-gap:8px}
   .hm-att .hm-acts{width:100%;padding-left:42px;justify-content:flex-start}
   .hm-att .hm-acts .btn{flex:1}
-  .hm-chk{width:40px;height:40px;margin:-9px}
+  .hm-chk{width:44px;height:44px;margin:-11px}
   .card-h .link{display:inline-flex;align-items:center;min-height:36px}
   .hm-task .icobtn.sm{width:40px;height:40px}
   .hm-addbar{flex-wrap:wrap}
   .hm-wk{height:96px;gap:5px}
 }
 
-@media(max-width:899px){.hm-week h3 .hm-rep{display:inline-flex;align-items:center;min-height:40px;padding:0 4px;margin:-10px 0}}
+@media(max-width:899px){.hm-week h3 .hm-rep{display:inline-flex;align-items:center;justify-content:flex-end;min-height:44px;min-width:44px;padding:0 4px;margin:-12px 0}}
+
+/* ── v2 (B1, DESIGN-V2 §7.2–7.3) ── */
+.hm-grid2{display:grid;grid-template-columns:minmax(0,1fr) 340px;grid-template-areas:"m a" "m s";grid-template-rows:auto 1fr;gap:var(--s-5);align-items:start}
+.hm-grid2>div{display:flex;flex-direction:column;gap:var(--s-4);min-width:0}
+.hm-a{grid-area:a}.hm-m{grid-area:m}.hm-s{grid-area:s}
+.hm-kpis .kpi .v{font-variant-numeric:tabular-nums}
+.hm-ap.now{background:var(--accent-soft)}
+.hm-ap.now::before{background:var(--accent)}
+.hm-ap .t .hm-risks{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+.hm-ap .t .hm-risks:empty{display:none}
+.hm-risk{font-size:var(--t-xs);height:20px;padding:0 7px}
+.hm-risk.r-allergy,.hm-risk.r-debt{background:var(--danger-soft);color:var(--st-noshow-ink)}
+.hm-risk.r-unconf,.hm-risk.r-late{background:var(--warn-soft);color:var(--st-here-ink)}
+.hm-risk.r-new{background:var(--st-new);color:var(--st-new-ink)}
+.hm-empty{display:flex;flex-direction:column;align-items:center;gap:6px;padding:28px 16px;text-align:center;color:var(--mute)}
+.hm-empty b{color:var(--ink);font-weight:600}
+.hm-empty .btn{margin-top:6px}
+.hm-done{border-top:1px solid var(--line)}
+.hm-done summary{list-style:none;cursor:pointer;padding:12px 16px;font-size:var(--t-sm);color:var(--mute);min-height:44px;display:flex;align-items:center}
+.hm-done summary::-webkit-details-marker{display:none}
+.hm-done summary::after{content:"";margin-left:8px;width:6px;height:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg) translateY(-2px)}
+.hm-done[open] summary::after{transform:rotate(-135deg) translateY(-2px)}
+.hm-done .li:last-child{border-bottom:0}
+.hm-more{width:100%;min-height:44px;color:var(--ink-2);font-weight:500;font-size:var(--t-sm);border-top:1px solid var(--line)}
+/* каса дня */
+.hm-cash h3{display:flex;align-items:center}
+.hm-cash-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.hm-meth{display:flex;flex-direction:column;margin-bottom:14px}
+.hm-meth>div{display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid var(--line);font-size:var(--t-sm)}
+.hm-meth>div span{color:var(--mute)}
+.hm-meth .hm-meth-t{border-bottom:0;font-weight:600}
+.hm-meth .hm-meth-t span{color:var(--ink)}
+.hm-cash-e{margin:0 0 14px;font-size:var(--t-sm)}
+.hm-cash .note{margin-top:4px}
+/* мій день */
+.hm-myday{max-width:760px}
+.hm-dnav{display:flex;align-items:center;gap:var(--s-3);margin-bottom:var(--s-4)}
+.hm-dnav-t{flex:1;min-width:0;text-align:center;display:flex;flex-direction:column}
+.hm-dnav-t b{font-family:var(--font-d);font-size:var(--t-xl);font-weight:600;letter-spacing:-.01em}
+.hm-dnav-t span{color:var(--mute);font-size:var(--t-sm)}
+.hm-today{display:flex;margin:-8px auto var(--s-3)}
+.hm-k2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.hm-myday>.card,.hm-myday>.kpis{margin-bottom:var(--s-4)}
+.hm-cur.on{box-shadow:inset 3px 0 0 var(--accent)}
+.hm-cur-h{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.hm-cur-l{font-size:var(--t-sm);color:var(--mute);font-weight:500}
+.hm-cur.on .hm-cur-l{color:var(--accent);font-weight:600}
+.hm-cur-c{display:flex;align-items:center;gap:12px;min-width:0}
+.hm-cur-c .t{min-width:0;flex:1}
+.hm-cur-n{margin-top:12px}
+.hm-cur-b{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.hm-gap{color:var(--mute);background:var(--bg);text-align:left;cursor:pointer;border-left:0;border-right:0;border-top:0}
+.hm-gap:hover{background:var(--hover-row)}
+.hm-gap .t b{font-weight:500;color:var(--mute)}
+.hm-gap .hm-time b{color:var(--faint);font-weight:500}
+.hm-gap-a{display:inline-flex;align-items:center;gap:4px;color:var(--ink);font-weight:500;font-size:var(--t-sm)}
+.hm-acc .li.click{text-align:left;background:var(--bg);border-left:0;border-right:0;border-top:0;cursor:pointer}
+@media (max-width:1100px){
+  .hm-grid2{grid-template-columns:minmax(0,1fr);grid-template-areas:"a" "m" "s";grid-template-rows:auto}
+}
+@media (max-width:899px){
+  .hm-kpis:not(.hm-k2){grid-template-columns:repeat(2,minmax(0,1fr))}
+  .hm-kpis:not(.hm-k2) .kpi:nth-child(3){border-left:0}
+  .hm-kpis .kpi:nth-child(n+3){border-top:1px solid var(--line)}
+  .hm-kpis .kpi .v{font-size:var(--t-xl)}
+  .hm-attn .hm-att.hm-x{display:none}
+  .hm-attn.open .hm-att.hm-x{display:flex}
+  .hm-ap{min-height:56px}
+  .hm-ap .hm-acts .btn{height:44px}
+  .hm-att .hm-acts .btn{height:44px}
+  .hm-dnav .icobtn{width:44px;height:44px}
+  .hm-cur-b .btn{flex:1;height:48px}
+  .hm-cash .btn.blk{height:48px}
+  .hm-today{height:44px}
+  .hm-gap{min-height:56px}
+  .hm-page .page-h h2{font-size:var(--t-xl)}
+}
+@media (max-width:360px){
+  .hm-kpis .kpi{padding:10px 12px}
+  .hm-kpis .kpi .v{font-size:var(--t-lg)}
+}
+@media (max-width:899px){.hm-cash h3 .link,.card-h .link{display:inline-flex;align-items:center;min-height:44px;margin:-12px 0}}
+a.hm-more{display:flex;align-items:center;justify-content:center;text-decoration:none}
+@media (max-width:899px){
+  .hm-page .card-h .link,.hm-cash h3 .link{min-width:44px;justify-content:flex-end}
+  .hm-page .icobtn{min-width:44px;min-height:44px}
+  .hm-page .btn.sm{height:44px}
+  .hm-ap .t small{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+}
+@media (max-width:899px){.hm-page .seg button,.hm-page .seg a,.hm-page .seg label{min-height:44px}}
+/* бокова колонка 340px на ПК: дії під текстом, щоб текст не ламався по слову */
+@media (min-width:1101px){
+  .hm-grid2 .hm-a .hm-att,.hm-grid2 .hm-s .hm-att{flex-wrap:wrap;row-gap:8px;align-items:flex-start}
+  .hm-grid2 .hm-a .hm-att .hm-acts{width:100%;padding-left:42px;justify-content:flex-start}
+}

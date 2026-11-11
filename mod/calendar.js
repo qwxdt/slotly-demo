@@ -118,10 +118,12 @@ function readQ(q){
   S.st=q.st||'';S.src=q.src||'';S.unpaid=q.unpaid==='1';S.qq=q.q||'';
   S.showCancelled=q.xc==='1';
   S.showOff=q.off==='1';
+  S.move=q.move&&App.appt(q.move)&&!App.appt(q.move).block?q.move:'';
+  if(S.move)S.v='day';
   if(!q.v&&!q.d&&!q.m)S.fromTab=true;
 }
 function go(patch,replace){
-  var q={v:S.v,d:S.d,m:S.m,r:S.v==='list'?S.r:'',st:S.st,src:S.src,unpaid:S.unpaid?1:'',q:S.qq,xc:S.showCancelled?1:'',off:S.showOff?1:''};
+  var q={v:S.v,d:S.d,m:S.m,r:S.v==='list'?S.r:'',st:S.st,src:S.src,unpaid:S.unpaid?1:'',q:S.qq,xc:S.showCancelled?1:'',off:S.showOff?1:'',move:S.move||''};
   Object.assign(q,patch);
   if(q.v==='day')q.v='';
   if(q.d===App.today())q.d='';
@@ -151,8 +153,11 @@ function topHtml(){
      '<button class="icobtn sm" data-act="cal-next" aria-label="Далі" title="Далі (→)">'+I('right')+'</button></div>';
   h+='<label class="cal-date" title="Обрати дату">'+I('cal','s')+'<span>'+esc(rangeLabel())+'</span>'+(dayRelTag()&&isDay?'<em>'+dayRelTag()+'</em>':'')+'<input type="date" value="'+S.d+'" data-cal-pick aria-label="Обрати дату"></label>';
   h+='<div class="seg" role="tablist">'+[['day','День'],['week','Тиждень'],['list','Список']].map(function(x){return '<button data-act="cal-view" data-v="'+x[0]+'" aria-pressed="'+(S.v===x[0])+'">'+x[1]+'</button>'}).join('')+'</div>';
+  h+='<span class="sp"></span>';
+  if(canAll()&&S.v!=='list'){var ms=visibleMasters();
+    h+='<label class="cal-msel">'+I('user','s')+'<select class="sel" data-cal-m aria-label="Майстер"><option value="">Усі майстри</option>'+ms.map(function(m){return '<option value="'+m.id+'"'+(S.m===m.id?' selected':'')+'>'+esc(m.short)+'</option>'}).join('')+'</select></label>';}
   if(S.v!=='list')h+='<div class="cal-zoom" title="Масштаб"><button class="icobtn sm" data-act="cal-zoom" data-z="-1" aria-label="Зменшити">'+I('minus','s')+'</button><button class="icobtn sm" data-act="cal-zoom" data-z="1" aria-label="Збільшити">'+I('plus','s')+'</button></div>';
-  h+='<button class="btn pri" data-act="cal-new" title="Новий запис (N)">'+I('plus')+'Запис</button></div>';
+  h+='<button class="icobtn sm" data-act="cal-more-menu" aria-label="Ще" title="Вид, друк, CSV">'+I('more')+'</button></div>';
   return h;
 }
 function mobBarHtml(){
@@ -170,6 +175,7 @@ function mobChips(){
   var cur=S.mobM;
   var h='<div class="cal-chips hscroll" role="tablist">';
   if(S.v!=='day'&&canAll())h+='<button class="chip" data-act="cal-mchip" data-m="" aria-pressed="'+(!cur)+'">Усі</button>';
+  else if(S.v==='day'&&canAll()&&ms.length>1)h+='<button class="chip" data-act="cal-mchip" data-m="*" aria-pressed="'+(cur==='*')+'">Усі</button>';
   ms.forEach(function(m){
     var st=S.v==='day'?dayStats(S.d,m.id):null;
     var off=S.v==='day'&&!st.wh;
@@ -194,19 +200,20 @@ App.route('calendar',{title:'Календар',icon:'cal',nav:true,group:'work',
       var ms=visibleMasters();
       if(!canAll())S.mobM=App.db.meId;
       else if(S.m)S.mobM=S.m;
+      else if(S.mobM==='*'){}
       else if(!S.mobM||!ms.find(function(m){return m.id===S.mobM})){
         var w=ms.find(function(m){return App.workHours(m.id,S.d)});S.mobM=(w||ms[0]||{}).id||'';
       }
     }else if(isMob()){
-      if(S.m)S.mobM=S.m;else if(!canAll())S.mobM=App.db.meId;
+      if(S.m)S.mobM=S.m;else if(!canAll())S.mobM=App.db.meId;else if(S.v==='list')S.mobM='';
       else if(S.v==='week'&&!S.mobM)S.mobM='';
     }
     if(S.v==='list'&&!q.r)S.r=S.r||'day';
     if(!isMob())localStorage.setItem(LS_V,S.v);
-    App.setTop(isMob()?'<button class="icobtn" data-act="cal-sidebtn" aria-label="Зведення" title="Зведення дня">'+I('chart')+'</button>':topHtml());
-    view.innerHTML='<div class="cal cal-v-'+S.v+'">'+(isMob()?mobBarHtml()+mobChips():'')+
+    App.setTop(isMob()?'<button class="icobtn" data-act="cal-sidebtn" aria-label="Зведення" title="Зведення дня">'+I('chart')+'</button><button class="icobtn" data-act="cal-more-menu" aria-label="Ще">'+I('more')+'</button>':topHtml());
+    view.innerHTML='<div class="cal cal-v-'+S.v+(S.move?' is-move':'')+'">'+(isMob()?mobBarHtml()+mobChips():'')+(S.move?moveBarHtml():'')+
       (S.v==='day'?dayHtml():S.v==='week'?weekHtml():listHtml())+
-      (isMob()?'<button class="cal-fab" data-act="cal-new" aria-label="Новий запис">'+I('plus','l')+'</button>':'')+'</div>';
+      '</div>';
     afterRender(view);
   }
 });
@@ -245,22 +252,21 @@ function lanes(list){
   });
   return out;
 }
-function iconsFor(a,fv){
-  var ic='';
-  if(a.block)return I('lock');
-  var dep=depositPaid(a);
-  if(a.client&&fv[a.client]&&fv[a.client].id===a.id)ic+='<span class="cal-ic ic-new" title="Перший візит">'+I('star')+'</span>';
-  if(dep>0)ic+='<span class="cal-ic ic-dep" title="Передоплата '+esc(U.uah(dep))+'">'+I('shield')+'</span>';
-  else if(a.deposit>0)ic+='<span class="cal-ic ic-nodep" title="Передоплата '+esc(U.uah(a.deposit))+' не внесена">'+I('shield')+'</span>';
-  var c=a.client&&cl(a.client);
-  if(c&&c.tags.indexOf('allergy')>=0)ic+='<span class="cal-ic ic-warn" title="Алергія">'+I('alert')+'</span>';
-  if(a.note)ic+='<span class="cal-ic" title="'+esc(a.note)+'">'+I('note')+'</span>';
-  if(unpaidFlag(a))ic+='<span class="cal-ic ic-unp" title="Не оплачено">'+I('cash')+'</span>';
-  return ic;
+var RISK_IC={new:['star',''],unconf:['clock','warn'],debt:['cash','dng'],late:['ban','dng'],allergy:['alert','warn']};
+function needDeposit(a){return !a.block&&a.deposit>0&&!depositPaid(a)&&(a.status==='new'||a.status==='confirmed')}
+function risksHtml(a,big){
+  if(a.block)return '<span class="risk">'+I('lock')+'</span>';
+  var r=App.apptRisks(a),h='';
+  r.forEach(function(x){var m=RISK_IC[x.k]||['info',''];h+='<span title="'+esc(x.t)+'">'+I(m[0],m[1])+'</span>'});
+  if(needDeposit(a))h+='<span title="Очікує передоплати '+esc(U.uah(a.deposit))+'">'+I('shield','warn')+'</span>';
+  if(a.status==='done'&&App.apptDue(a)<=0)h+='<span class="cal-paid" title="Оплачено">'+I('check')+'</span>';
+  else if(unpaidFlag(a))h+='<span title="Не оплачено">'+I('cash','dng')+'</span>';
+  return h?'<span class="risk">'+h+'</span>':'';
 }
+function iconsFor(a,fv){return risksHtml(a)}
 function apptBlockHtml(a,lo,ppm,fv,ln){
   var top=(a.start-lo)*ppm,dur=App.apptDur(a),h=Math.max(16,dur*ppm);
-  var cls='cal-ap st-'+statusCls(a.status)+(a.block?' is-block':'')+(MOVABLE[a.status]?' can-drag':'')+(isLate(a)?' is-late':'')+(unpaidFlag(a)?' is-unpaid':'')+(a.status==='cancelled'?' is-cx':'');
+  var cls='cal-ap st-'+statusCls(a.status)+(a.block?' is-block':'')+(MOVABLE[a.status]&&!isMob()?' can-drag':'')+(isLate(a)?' is-late':'')+(unpaidFlag(a)?' is-unpaid':'')+(a.status==='cancelled'?' is-cx':'')+(S.move===a.id?' is-moving':'');
   var size=h<40?'s1':h<62?'s2':h<84?'s3':'s4';
   var w=100/ln.n,left=ln.l*w;
   var st='top:'+(top+1).toFixed(1)+'px;height:'+(h-2).toFixed(1)+'px;left:calc('+left+'% + 2px);width:calc('+w+'% - 4px)';
@@ -268,10 +274,10 @@ function apptBlockHtml(a,lo,ppm,fv,ln){
   var title=a.block?(a.label||'Блок часу'):cname(a);
   var sv=a.block?(a.note||''):App.apptTitle(a);
   var inner='<div class="l1"><span class="tm">'+tm+'</span><span class="ic">'+iconsFor(a,fv)+'</span></div>'+
-    '<div class="l2">'+esc(title)+(size==='s1'?'<span class="s1sv"> · '+esc(sv)+'</span>':'')+'</div>'+
-    (size!=='s1'&&size!=='s2'?'<div class="l3">'+esc(sv)+'</div>':size==='s2'?'':'');
-  if(size==='s4'&&!a.block&&a.client){var c=cl(a.client);if(c&&c.ph&&!isMob())inner+='<div class="l4">'+esc(U.phone(c.ph))+'</div>'}
-  return '<div class="'+cls+' '+size+'" data-id="'+a.id+'" style="'+st+'" tabindex="0" role="button" aria-label="'+esc(title+', '+tm)+'">'+inner+(MOVABLE[a.status]?'<i class="cal-rs" title="Змінити тривалість"></i>':'')+'</div>';
+    '<div class="l2">'+esc(title)+(size==='s1'&&dur>=45?'<span class="s1sv"> · '+esc(sv)+'</span>':'')+'</div>'+
+    (size!=='s1'&&(dur>=45||a.block)&&sv?'<div class="l3">'+esc(sv)+'</div>':'');
+  if(dur>=90&&!isMob()&&!a.block&&a.client&&App.canSeePhone()){var c=cl(a.client);if(c&&c.ph)inner+='<div class="l4">'+esc(App.phoneOf(c))+'</div>'}
+  return '<div class="'+cls+' '+size+'" data-id="'+a.id+'" style="'+st+'" tabindex="0" role="button" aria-label="'+esc(title+', '+tm)+'">'+inner+(MOVABLE[a.status]&&!isMob()?'<i class="cal-rs" title="Змінити тривалість"></i>':'')+'</div>';
 }
 function gapsFor(col,lo,ppm){
   /* вільні проміжки ≥45 хв у межах графіка (для майбутнього) */
@@ -322,10 +328,10 @@ function gridHtml(cols,o){
     var list=App.apptsOn(c.date,c.staff).filter(function(a){return S.showCancelled||a.status!=='cancelled'});
     var ln=lanes(list);
     var a=c.date===T&&showNow?'<div class="cal-now" style="top:'+((nowM-lo)*ppm)+'px"></div>':'';
-    body+='<div class="cal-col'+(c.date===T?' is-today':'')+(c.date<T?' is-past':'')+'" data-staff="'+c.staff+'" data-date="'+c.date+'" style="height:'+H+'px">'+offHtml(c,lo,hi,ppm)+gapsFor(c,lo,ppm)+
+    body+='<div class="cal-col'+(c.date===T?' is-today':'')+(c.date<T?' is-past':'')+'" data-staff="'+c.staff+'" data-date="'+c.date+'" style="height:'+H+'px">'+offHtml(c,lo,hi,ppm)+(S.move?moveZones(c,lo,ppm):gapsFor(c,lo,ppm))+
       list.map(function(x){return apptBlockHtml(x,lo,ppm,fv,ln[x.id])}).join('')+a+'</div>';
   });
-  var minW=o.minCol||(isMob()?0:132);
+  var minW=o.minCol||(isMob()?(S.v==='day'&&S.mobM==='*'&&cols.length>1?(window.innerWidth<360?132:110):0):160);
   return '<div class="cal-wrap" data-lo="'+lo+'" data-hi="'+hi+'" data-ppm="'+ppm+'" data-step="'+step+'" style="--ppm:'+ppm+';--step:'+(step*ppm)+'px;--n:'+cols.length+';--cw:'+minW+'px">'+
     '<div class="cal-gridin">'+head+'<div class="cal-bd" style="height:'+H+'px">'+axis+body+'</div></div></div>';
 }
@@ -336,16 +342,17 @@ function masterHead(m,date){
   var off=App.timeOff(m.id,date);
   var sub=!st.wh?(off?(OFFKIND[off.kind]||'Відсутня'):'Вихідний'):(lv?lv.n:m.spec);
   return '<button class="cal-mh'+(st.wh?'':' is-off')+'" data-act="cal-mhead" data-m="'+m.id+'" title="Тиждень: '+esc(m.n)+'">'+
-    '<span class="r1">'+UI.av(m,'')+'<span class="t"><b class="ell">'+esc(m.short)+'</b><small class="ell">'+esc(sub)+(st.n?' · '+st.n+' '+U.plural(st.n,'запис','записи','записів'):'')+'</small></span></span>'+
+    '<span class="r1">'+UI.av(m,'')+(function(){var n=waitCountFor(m.id,date);return n?'<span class="cal-wn" title="'+n+' '+U.plural(n,'клієнт чекає','клієнти чекають','клієнтів чекають')+' вікна">'+n+'</span>':''})()+'<span class="t"><b class="ell">'+esc(m.short)+'</b><small class="ell">'+esc(sub)+(st.n?' · '+st.n+' '+U.plural(st.n,'запис','записи','записів'):'')+'</small></span></span>'+
     (st.wh?'<span class="cal-load" title="Завантаження '+st.pct+'%"><i style="width:'+st.pct+'%"></i></span><span class="cal-mh-f"><span>'+st.pct+'%</span><span title="'+(date<=T?'Виторг':'Заплановано')+'">'+(sum?U.uah(sum):'—')+'</span></span>':'<span class="cal-load"></span><span class="cal-mh-f"><span>'+(off&&off.note?esc(off.note):'')+'</span></span>')+'</button>';
 }
 function dayCols(){
   var ms=visibleMasters(),date=S.d,cols=[];
-  if(isMob()){ms=ms.filter(function(m){return m.id===S.mobM})}
+  var mall=isMob()&&S.mobM==='*';
+  if(isMob()&&!mall){ms=ms.filter(function(m){return m.id===S.mobM})}
   else if(S.m)ms=ms.filter(function(m){return m.id===S.m});
   ms.forEach(function(m){
     var wh=App.workHours(m.id,date),has=App.apptsOn(date,m.id).some(function(a){return S.showCancelled||a.status!=='cancelled'});
-    var explicit=S.m||isMob();
+    var explicit=S.m||(isMob()&&!mall);
     if(!wh&&!has&&!explicit&&!S.showOff)return;
     var off=App.timeOff(m.id,date);
     cols.push({key:m.id,staff:m.id,date:date,wh:wh,off:off?{label:(OFFKIND[off.kind]||'Відсутня')+(off.note&&off.note!==OFFKIND[off.kind]?' · '+off.note:'')}:null,head:masterHead(m,date)});
@@ -364,12 +371,9 @@ function noteStripHtml(){
 function subHtml(){
   var ms=visibleMasters();
   var h='<div class="cal-sub">';
-  if(!isMob()&&canAll()){
-    h+='<label class="cal-msel">'+I('user','s')+'<select class="sel" data-cal-m aria-label="Майстер"><option value="">Усі майстри</option>'+ms.map(function(m){return '<option value="'+m.id+'"'+(S.m===m.id?' selected':'')+'>'+esc(m.short)+'</option>'}).join('')+'</select></label>';
-  }
   var strip=S.v==='day'?offStrip():'';
   h+='<span class="cal-offs">'+(strip?I('coffee','s')+' '+strip:'')+'</span><span class="sp"></span>';
-  h+='<button class="chip" data-act="cal-xc" aria-pressed="'+S.showCancelled+'">Скасовані</button>';
+  h+='<button class="chip" data-act="cal-xc" aria-pressed="'+S.showCancelled+'">'+(S.showCancelled?'Сховати скасовані':'Показати скасовані')+'</button>';
   if(S.v==='day')h+='<button class="chip cal-sidebtn" data-act="cal-sidebtn">'+I('chart','s')+'Зведення</button>';
   return h+'</div>';
 }
@@ -422,7 +426,7 @@ function panelHtml(date){
       return '<button class="cal-ur" data-act="cal-client" data-id="'+c.id+'">'+I('cake','s')+'<span class="ell">'+esc(c.n)+'</span><small>'+(age?age+' '+U.plural(age,'рік','роки','років'):'')+'</small></button>'}).join('')+'</div></section>';
   }
   if(mods().waitlist!==false&&canAll()){
-    var wl=App.db.waitlist.slice().sort(function(a,b){return a.created<b.created?-1:1});
+    var wl=App.db.waitlist.filter(function(w){return (w.status||'wait')==='wait'}).sort(function(a,b){return a.created<b.created?-1:1});
     h+='<section><h4>Лист очікування <span class="pill-n">'+wl.length+'</span><span class="sp"></span><button class="link" data-act="cal-wl-add">+ Додати</button></h4>';
     if(!wl.length)h+='<div class="mute" style="font-size:13px">Порожньо. Додайте клієнта, якщо немає вільного вікна — система підкаже, коли воно зʼявиться.</div>';
     else h+='<div class="cal-wl">'+wl.map(function(w){var c=cl(w.client),sv=App.svc(w.svc),st=w.staff&&App.staff(w.staff);
@@ -523,7 +527,9 @@ function listHtml(){
       (newCount?'<button class="btn sm" data-act="cal-bulk-new">Обрати непідтверджені ('+newCount+')</button>':''))+
     '<button class="btn sm" data-act="cal-export">'+I('download','s')+'CSV</button></div>';
   if(!arr.length){
-    return h+UI.empty('search','Записів не знайдено','Спробуйте змінити фільтри або період.','<button class="btn pri" data-act="cal-new" style="margin-top:8px">Новий запис</button>');
+    var filt=S.qq||S.st||S.src||S.unpaid||(canAll()&&S.m);
+    if(filt)return h+UI.empty('search','Нічого не знайдено','За цими фільтрами записів немає.','<button class="btn" data-act="cal-lreset" style="margin-top:8px">Скинути фільтри</button>');
+    return h+UI.empty('cal',S.r==='month'?'У цьому місяці записів немає':S.r==='week'?'На цьому тижні записів немає':'Записів за цей день немає','Додайте запис або поділіться посиланням на онлайн-запис.','<div class="row" style="margin-top:8px;justify-content:center"><button class="btn" data-act="cal-copylink">Копіювати посилання</button><button class="btn pri" data-act="cal-new">Новий запис</button></div>');
   }
   var rows='',lastD='',shown=arr.slice(0,S.lim);
   var multi=rg[0]!==rg[1];
@@ -533,7 +539,7 @@ function listHtml(){
     var payTxt=isBlock(a)?'':a.status==='cancelled'||a.status==='noshow'?'<span class="faint">—</span>':a.status==='done'?(App.apptDue(a)>0?'<span class="warn-t">борг '+U.uah(App.apptDue(a))+'</span>':'<span class="ok-t">Оплачено</span>'):(a.deposit>0&&depositPaid(a)>0?'передопл. '+U.uah(depositPaid(a)):'<span class="faint">—</span>');
     rows+='<tr class="click" data-id="'+a.id+'"><td class="cal-c-chk"><label class="check" data-nopen><input type="checkbox" data-cal-chk="'+a.id+'"'+(S.sel[a.id]?' checked':'')+'></label></td>'+
       '<td class="cal-c-tm num"><b>'+hmp(a.start)+'</b><small>'+(multi?'':'–'+hmp(App.apptEnd(a)))+'</small></td>'+
-      '<td class="cal-c-cl">'+(isBlock(a)?'<span class="av sm">'+I('lock','s')+'</span>':UI.av(c||{n:'?',id:'x'},'sm'))+'<span class="t"><b class="ell">'+esc(cname(a))+'</b><small class="ell">'+(c&&c.ph?esc(U.phone(c.ph)):isBlock(a)?'Блок часу':'')+'</small></span></td>'+
+      '<td class="cal-c-cl">'+(isBlock(a)?'<span class="av sm">'+I('lock','s')+'</span>':UI.av(c||{n:'?',id:'x'},'sm'))+'<span class="t"><b class="ell">'+esc(cname(a))+'</b><small class="ell">'+(c&&c.ph&&App.canSeePhone()?esc(App.phoneOf(c)):isBlock(a)?'Блок часу':'')+'</small></span></td>'+
       '<td class="cal-c-sv"><span class="ell">'+esc(isBlock(a)?(a.note||'—'):App.apptTitle(a)||'—')+'</span></td>'+
       '<td class="cal-c-m">'+(m?esc(m.short):'')+'</td>'+
       '<td class="cal-c-src">'+esc(App.SRC[a.src]||a.src||'')+'</td>'+
@@ -591,7 +597,7 @@ act('new',function(){App.newAppt({staff:S.m||undefined,date:S.d})});
 act('day',function(el){var p={v:'day',d:el.dataset.d};if(el.dataset.m)p.m=el.dataset.m;go(p)});
 act('mweek',function(el){go({v:'week',m:el.dataset.m})});
 act('mhead',function(el){go({v:'week',m:el.dataset.m})});
-act('mchip',function(el){S.mobM=el.dataset.m;go({m:el.dataset.m},true)});
+act('mchip',function(el){var m=el.dataset.m;S.mobM=m;go({m:m==='*'?'':m},true)});
 act('xc',function(){go({xc:S.showCancelled?'':1},true)});
 act('showoff',function(){go({off:1},true)});
 act('open',function(el){App.openAppt(el.dataset.id)});
@@ -614,6 +620,21 @@ act('wl-add',function(){waitlistForm()});
 act('wl-del',function(el){var id=el.dataset.id;var w=App.db.waitlist.find(function(x){return x.id===id});if(!w)return;
   App.ops.removeWaitlist(id);UI.toast('Видалено з листа очікування',{undo:function(){App.ops.setWaitlist(w)}})});
 act('wl-find',function(el){waitlistFind(el.dataset.id)});
+act('more-menu',function(el){
+  var L=[];
+  if(S.v!=='list')L.push({ic:'cal',t:'Записи за місяць',fn:function(){go({v:'list',r:'month'})}});
+  L.push({ic:'x',t:S.showCancelled?'Сховати скасовані':'Показати скасовані',fn:function(){go({xc:S.showCancelled?'':1},true)}});
+  if(S.v==='day')L.push({ic:'door',t:S.showOff?'Сховати вихідних майстрів':'Показати вихідних майстрів',fn:function(){go({off:S.showOff?'':1},true)}});
+  if(S.v==='day'&&isMob()&&canAll())L.push({ic:'note',t:'Нотатка до дня',fn:function(){editDayNote()}});
+  if(S.v==='day')L.push({ic:'print',t:'Друк дня',fn:function(){try{window.print()}catch(e){}}});
+  L.push({ic:'download',t:'Експорт CSV',fn:function(){App.actions['cal-export']({target:el})}});
+  if(App.can('settings.manage'))L.push('-'),L.push({ic:'cog',t:'Налаштування сітки',fn:function(){App.go('settings')}});
+  if(mods().waitlist!==false&&canAll())L.push({ic:'clock',t:'Лист очікування',fn:function(){App.go('waitlist')}});
+  UI.menu(el,L);
+});
+act('lreset',function(){S.qq='';go({q:'',st:'',src:'',unpaid:'',m:''},true)});
+act('copylink',function(){var u='https://slotly.app/sola';try{navigator.clipboard&&navigator.clipboard.writeText(u)}catch(e){}UI.toast('Посилання на онлайн-запис скопійовано')});
+
 /* список */
 act('lr',function(el){go({r:el.dataset.r})});
 act('lunp',function(){go({unpaid:S.unpaid?'':1},true)});
@@ -652,20 +673,22 @@ document.addEventListener('click',function(e){
   if(tr&&!t.closest('[data-nopen]')&&!t.closest('button,a')){App.openAppt(tr.dataset.id);return}
   /* клік по блоку */
   var ap=t.closest&&t.closest('.cal-ap');
-  if(ap){if(Date.now()-(S.dragEnd||0)<350)return;App.openAppt(ap.dataset.id);return}
+  if(ap){if(Date.now()-(S.dragEnd||0)<350||Date.now()-(S.lpAt||0)<600)return;if(S.move&&ap.dataset.id===S.move){UI.toast('Оберіть новий час у підсвіченій зоні');return}App.openAppt(ap.dataset.id);return}
   /* клік по порожньому місцю колонки */
   var col=t.closest&&t.closest('.cal-col');
   if(col&&!t.closest('.cal-gap button,.cal-off.all')){
     if(Date.now()-(S.dragEnd||0)<350)return;
-    var wrap=col.closest('.cal-wrap'),lo=+wrap.dataset.lo,ppm=+wrap.dataset.ppm,step=+wrap.dataset.step/ppm;
+    var wrap=col.closest('.cal-wrap'),lo=+wrap.dataset.lo,ppm=+wrap.dataset.ppm,step=+wrap.dataset.step;
+    if(Date.now()-(S.lpAt||0)<600)return;
     var r=col.getBoundingClientRect();var m=lo+(e.clientY-r.top)/ppm;m=Math.floor(m/step)*step;
+    if(S.move){moveTo(col.dataset.staff,col.dataset.date,Math.max(0,Math.round(m)));return}
     App.newAppt({staff:col.dataset.staff,date:col.dataset.date,start:Math.max(0,Math.round(m))});
   }
 });
 
 /* ───────── hover-привид, drag & drop, resize ───────── */
 var hov=null;
-function colInfo(col){var w=col.closest('.cal-wrap');return {lo:+w.dataset.lo,hi:+w.dataset.hi,ppm:+w.dataset.ppm,step:+w.dataset.step/+w.dataset.ppm,wrap:w}}
+function colInfo(col){var w=col.closest('.cal-wrap');return {lo:+w.dataset.lo,hi:+w.dataset.hi,ppm:+w.dataset.ppm,step:+w.dataset.step,wrap:w}}
 document.addEventListener('mousemove',function(e){
   if(S.drag||isMob()||!App.cur||App.cur.rt.id!=='calendar')return;
   var col=e.target.closest&&e.target.closest('.cal-col');
@@ -790,25 +813,141 @@ function dragEnd(){
   var old={staff:a.staff,date:a.date,start:a.start};
   var apply2=function(){
     App.ops.updateAppt(a.id,{staff:tg.staff,date:tg.date,start:tg.start});
+    afterChange(a,'move',{staff:old.staff,date:old.date,start:old.start,dur:App.apptDur(a)});
     UI.toast('Перенесено на '+hmp(tg.start)+' · '+App.staff(tg.staff).short.split(' ')[0]+(tg.date!==old.date?' · '+D.shortH(tg.date):''),{undo:function(){App.ops.updateAppt(a.id,old,'Перенесення скасовано')}});
   };
   if(cs.length)askConflict(cs).then(function(y){if(y)apply2()});else apply2();
 }
 
-/* ───────── свайп (мобільний): день ← → ───────── */
+/* ───────── свайп (мобільний): день ← → (поріг 30 %, зсув за пальцем) ───────── */
 (function(){
-  var sx=0,sy=0,t0=0,on=false;
+  var sx=0,sy=0,t0=0,on=false,lock=0,el=null;
   document.addEventListener('touchstart',function(e){
-    if(!isMob()||!App.cur||App.cur.rt.id!=='calendar'||S.v==='list'){on=false;return}
-    if(e.target.closest('.cal-ap,.cal-chips,.cal-mbar,input,select'))  {on=false;return}
-    if(!e.target.closest('.cal-wrap,.cal-wkl')){on=false;return}
+    on=false;lock=0;
+    if(!isMob()||!App.cur||App.cur.rt.id!=='calendar'||S.v==='list')return;
+    if(e.target.closest('.cal-chips,.cal-mbar,.cal-movebar,input,select'))return;
+    el=e.target.closest('.cal-wrap,.cal-wkl');if(!el)return;
+    if(el.scrollWidth>el.clientWidth+4)return; /* «Усі» з горизонтальним скролом — не заважаємо */
     on=true;sx=e.touches[0].clientX;sy=e.touches[0].clientY;t0=Date.now();
   },{passive:true});
+  document.addEventListener('touchmove',function(e){
+    if(!on||S.drag)return;var dx=e.touches[0].clientX-sx,dy=e.touches[0].clientY-sy;
+    if(!lock){if(Math.abs(dx)>10&&Math.abs(dx)>Math.abs(dy)*1.5)lock=1;else if(Math.abs(dy)>10)lock=-1}
+    if(lock===1){el.style.transform='translateX('+dx+'px)';el.style.opacity=String(1-Math.min(.5,Math.abs(dx)/window.innerWidth))}
+  },{passive:true});
   document.addEventListener('touchend',function(e){
-    if(!on||S.drag)return;on=false;var t=e.changedTouches[0],dx=t.clientX-sx,dy=t.clientY-sy;
-    if(Math.abs(dx)>70&&Math.abs(dx)>Math.abs(dy)*2&&Date.now()-t0<700){go({d:shiftDate(dx<0?1:-1)})}
+    if(!on)return;on=false;var t=e.changedTouches[0],dx=t.clientX-sx;
+    var ok=lock===1&&(Math.abs(dx)>window.innerWidth*.3||(Math.abs(dx)>60&&Date.now()-t0<300));
+    if(el){el.style.transition='transform .18s,opacity .18s';el.style.transform='';el.style.opacity='';var e2=el;setTimeout(function(){e2.style.transition=''},200)}
+    if(ok)go({d:shiftDate(dx<0?1:-1)});
   },{passive:true});
 })();
+
+
+/* ═════════ B2: перенос (режим вибору слота), «Повідомити клієнта?», сигнал листа очікування ═════════ */
+App._b2move=true;App._b2wait=true;
+App.moveAppt=function(id){var a=App.appt(id);if(!a)return UI.toast('Запис не знайдено',{type:'err'});UI.closeAll();
+  /* телефон: відкриваємо день саме цього майстра (а не того, що був обраний), щоб вільні вікна були під пальцем */
+  if(isMob()&&canAll())S.mobM=a.staff;
+  App.go('calendar',{v:'day',d:a.date,m:isMob()?'':(S.m||''),move:id})};
+App.waitNew=function(o){waitlistForm(o||{})};
+function moveBarHtml(){
+  var a=App.appt(S.move);if(!a)return '';
+  return '<div class="cal-movebar" role="status">'+I('move','s')+'<span class="t">Оберіть новий час для <b>'+esc(U.short(cname(a)))+'</b><small>'+esc(dShort(a.date))+' · '+hmp(a.start)+' · '+esc(App.staff(a.staff).short)+'</small></span><span class="sp"></span><button class="btn sm" data-act="cal-move-x">Скасувати</button></div>';
+}
+function moveZones(col,lo,ppm){
+  /* у режимі переносу вільні вікна підсвічуються, тап по них = вибір часу */
+  var a=App.appt(S.move);if(!a||!col.wh)return '';
+  var T=App.today();if(col.date<T)return '';
+  var dur=App.apptDur(a),from=col.wh.start,to=col.wh.end;
+  if(col.date===T)from=Math.max(from,Math.ceil(D.nowMin()/15)*15);
+  var busy=[];App.apptsOn(col.date,col.staff).forEach(function(x){if(x.id!==a.id&&App.active(x))busy.push([x.start,App.apptEnd(x)])});
+  if(col.wh.brk)busy.push(col.wh.brk.slice());busy.sort(function(x,y){return x[0]-y[0]});
+  var gaps=[],cur=from;busy.forEach(function(b){if(b[0]>cur)gaps.push([cur,Math.min(b[0],to)]);cur=Math.max(cur,b[1])});if(cur<to)gaps.push([cur,to]);
+  return gaps.filter(function(g){return g[1]-g[0]>=dur}).map(function(g){return '<div class="cal-mz" style="top:'+((g[0]-lo)*ppm+1)+'px;height:'+((g[1]-g[0])*ppm-2)+'px" aria-hidden="true"></div>'}).join('');
+}
+function moveTo(staff,date,start){
+  var a=App.appt(S.move);if(!a){S.move='';return go({move:''})}
+  var dur=App.apptDur(a);
+  if(staff===a.staff&&date===a.date&&start===a.start)return UI.toast('Це поточний час запису');
+  var cs=App.conflicts(staff,date,start,dur,a.id);
+  var m=App.staff(staff);
+  var txt='Перенести на '+dShort(date)+' '+hmp(start)+' до '+m.short.split(' ')[0]+'?';
+  var bad=cs.filter(function(c){return c.type==='overlap'}).length?'Цей час перетинається з іншим записом.':cs.length?'Поза робочим часом майстра.':'';
+  UI.confirm({title:txt,text:esc(cname(a))+' · '+U.dur(dur)+(bad?'<br><b>'+bad+'</b>':''),ok:bad?'Все одно перенести':'Перенести'}).then(function(y){
+    if(!y)return;
+    var old={staff:a.staff,date:a.date,start:a.start};
+    App.ops.updateAppt(a.id,{staff:staff,date:date,start:start});
+    S.move='';go({move:'',d:date},true);
+    UI.toast('Перенесено на '+hmp(start)+' · '+m.short.split(' ')[0],{undo:function(){App.ops.updateAppt(a.id,old,'Перенесення скасовано')}});
+    afterChange(a,'move',{staff:old.staff,date:old.date,start:old.start,dur:dur});
+  });
+}
+act('move-x',function(){S.move='';go({move:''},true);UI.toast('Перенесення скасовано')});
+function fillTpl(k,a){
+  var c=a.client&&cl(a.client),sv=a.items&&a.items[0]&&App.svc(a.items[0].svc),m=App.staff(a.staff);
+  var t=(App.TPL&&App.TPL[k])||'';
+  return t.replace(/\{імʼя\}/g,c?c.n.split(' ')[0]:'').replace(/\{салон\}/g,(App.db.salon||{}).name||'').replace(/\{послуга\}/g,sv?sv.n:'послуга')
+    .replace(/\{дата\}/g,D.shortH(a.date)).replace(/\{час\}/g,hmp(a.start)).replace(/\{майстер\}/g,m?m.short.split(' ')[0]:'').replace(/\{посилання\}/g,'slotly.app/sola');
+}
+function notifyClient(a,kind){
+  a=App.appt(a.id)||a;var c=a.client&&cl(a.client);if(!c)return;
+  var ch=c.tg?'tg':c.ph?'viber':'';
+  var txt=fillTpl(kind,a);
+  if(!ch){
+    UI.modal({title:'Повідомити клієнта?',size:'narrow',body:'<p class="cal-nc-t">У клієнта немає Telegram/Viber — зателефонуйте.</p>',
+      foot:'<span class="sp"></span><button class="btn" data-no>Ні</button>',onMount:function(el,close){el.querySelector('[data-no]').onclick=close}});return;
+  }
+  UI.modal({title:'Повідомити клієнта?',sub:esc(c.n)+' · '+(ch==='tg'?'Telegram':'Viber'),size:'narrow cal-nc',
+    body:'<div class="bubble me">'+esc(txt)+'</div>'+(c.ph&&App.canSeePhone()?'<p class="cal-nc-t">Або <a href="tel:+'+c.ph+'">зателефонуйте '+esc(App.phoneOf(c))+'</a></p>':''),
+    foot:'<span class="sp"></span><button class="btn" data-no>Ні</button><button class="btn pri" data-ok>'+I(ch==='tg'?'tg':'msg','s')+'Надіслати</button>',
+    onMount:function(el,close){el.querySelector('[data-no]').onclick=close;el.querySelector('[data-ok]').onclick=function(){
+      App.ops.sendMsg({client:c.id,appt:a.id,ch:ch,tpl:kind,txt:txt});close();UI.toast('Повідомлення надіслано ('+(ch==='tg'?'Telegram':'Viber')+')')}}});
+}
+function waitSignal(fr){
+  if(mods().waitlist===false||!canAll()||!fr||!App.waitMatches)return;
+  var ws=App.waitMatches(fr.staff,fr.date,fr.start,fr.dur);if(!ws.length)return;
+  var m=App.staff(fr.staff);
+  UI.toast('Звільнилось '+hmp(fr.start)+' у '+esc(m.short.split(' ')[0])+' · '+ws.length+' '+U.plural(ws.length,'чекає','чекають','чекають')+' <a class="link" href="#/waitlist">Запропонувати</a>',{ms:7000});
+}
+function afterChange(a,kind,freed){
+  setTimeout(function(){waitSignal(freed)},kind==='cancel'?50:400);
+  setTimeout(function(){if(!$('.ov'))notifyClient(a,kind)},kind==='cancel'?120:60);
+}
+function waitCountFor(staff,date){
+  if(mods().waitlist===false||!canAll()||date<App.today())return 0;
+  return (App.db.waitlist||[]).filter(function(w){return (w.status||'wait')==='wait'&&date>=w.from&&date<=w.to&&(w.staff?w.staff===staff:App.performs(App.staff(staff),App.svc(w.svc)))}).length;
+}
+
+/* ───────── довге натискання (телефон) ───────── */
+(function(){
+  var tm=null,sx=0,sy=0;
+  document.addEventListener('touchstart',function(e){
+    if(!isMob()||!App.cur||App.cur.rt.id!=='calendar'||S.v!=='day')return;
+    var t=e.target;if(t.closest('.cal-chips,.cal-mbar,button:not(.cal-ap),input,select,a'))return;
+    var ap=t.closest('.cal-ap'),col=t.closest('.cal-col');if(!ap&&!col)return;
+    sx=e.touches[0].clientX;sy=e.touches[0].clientY;var cy=sy;clearTimeout(tm);
+    tm=setTimeout(function(){tm=null;S.lpAt=Date.now();
+      if(navigator.vibrate)try{navigator.vibrate(10)}catch(x){}
+      if(ap){var a=App.appt(ap.dataset.id);if(!a||a.block)return;apMenu(ap,a)}
+      else{var wrap=col.closest('.cal-wrap'),lo=+wrap.dataset.lo,ppm=+wrap.dataset.ppm,step=+wrap.dataset.step,r=col.getBoundingClientRect();
+        var m=Math.floor((lo+(cy-r.top)/ppm)/step)*step;
+        if(S.move)moveTo(col.dataset.staff,col.dataset.date,Math.max(0,Math.round(m)));
+        else App.newAppt({staff:col.dataset.staff,date:col.dataset.date,start:Math.max(0,Math.round(m))})}
+    },500);
+  },{passive:true});
+  function cancel(e){if(!tm)return;if(e&&e.touches&&e.touches[0]){var dx=e.touches[0].clientX-sx,dy=e.touches[0].clientY-sy;if(Math.abs(dx)<8&&Math.abs(dy)<8)return}clearTimeout(tm);tm=null}
+  document.addEventListener('touchmove',cancel,{passive:true});document.addEventListener('touchend',function(){clearTimeout(tm);tm=null},{passive:true});
+})();
+function apMenu(anchor,a){
+  var c=a.client&&cl(a.client),L=[];
+  if(a.status==='new'||a.status==='confirmed')L.push({ic:'check',t:'Прийшов(ла)',fn:function(){setStatus(a,'arrived')}});
+  if(MOVABLE[a.status])L.push({ic:'move',t:'Перенести',fn:function(){App.moveAppt(a.id)}});
+  if(a.status==='new'||a.status==='confirmed')L.push({ic:'x',t:'Скасувати',dng:true,fn:function(){cancelAppt(a)}});
+  if(c&&c.ph&&App.canSeePhone())L.push({ic:'phone',t:'Подзвонити',fn:function(){location.href='tel:+'+c.ph}});
+  L.push({ic:'right',t:'Відкрити запис',fn:function(){App.openAppt(a.id)}});
+  UI.menu(anchor,L);
+}
 
 /* ───────── клавіатура ───────── */
 document.addEventListener('keydown',function(e){
@@ -839,6 +978,7 @@ function editDayNote(){
 }
 
 /* ═════════ ФОРМА ЗАПИСУ (спільна для «Новий запис», «Редагувати», «Перенести») ═════════ */
+function nfDay(d){var T=App.today();return d===T?'сьогодні':d===D.add(T,1)?'завтра':dShort(d)}
 function copyItems(a){return (a||[]).map(function(x){return {svc:x.svc,price:x.price,d:x.d,custom:!!x.custom}})}
 function matchMasters(items){
   var ms=mastersAll();if(!items.length)return {fit:ms,other:[]};
@@ -895,6 +1035,7 @@ function bookingForm(root,init,cfg){
   function sec(n){return root.querySelector('[data-sec='+n+']')}
 
   /* — клієнт — */
+  function lastVisit(cid){var T0=App.today();return App.db.appts.filter(function(a){return a.client===cid&&a.status==='done'&&!a.block&&a.items&&a.items.length&&a.date<=T0}).sort(function(a,b){return a.date<b.date?1:a.date>b.date?-1:b.start-a.start})[0]||null}
   function rClient(){
     var el=sec('client');if(!el)return;
     var c=st.client&&cl(st.client);
@@ -903,6 +1044,10 @@ function bookingForm(root,init,cfg){
       el.innerHTML='<div class="cal-h">Клієнт</div><div class="cal-cc">'+UI.av(c,'')+'<span class="t"><b>'+esc(c.n)+(c.tags.indexOf('vip')>=0?' <span class="tag">VIP</span>':'')+'</b><small>'+(c.ph?esc(U.phone(c.ph)):'без телефону')+' · '+s.visits+' '+U.plural(s.visits,'візит','візити','візитів')+(s.noshow?' · не прийшов '+s.noshow:'')+'</small></span><button class="btn sm" data-x="chg">Змінити</button></div>'+
         (c.blocked?'<div class="note dng">'+I('ban')+'<span>Клієнт у чорному списку.</span></div>':'')+
         (c.tags.indexOf('allergy')>=0||c.note?'<div class="note warn">'+I('alert')+'<span>'+(c.tags.indexOf('allergy')>=0?'<b>Алергія. </b>':'')+esc(c.note||'')+'</span></div>':'');
+      /* «Як минулого разу» — один дотик підставляє послуги й майстра з останнього візиту */
+      var lv=lastVisit(c.id);
+      if(lv&&!st.items.length){var lm=App.staff(lv.staff);
+        el.innerHTML+='<button class="cal-rep" data-x="last">'+I('repeat','s')+'<span class="t"><b>Як минулого разу</b><small class="ell">'+esc(lv.items.map(function(x){var s=App.svc(x.svc);return s?s.n:''}).filter(Boolean).join(' + '))+(lm?' · '+esc(lm.short):'')+' · '+esc(D.human(lv.date))+'</small></span></button>'}
     }else if(st.noName){
       el.innerHTML='<div class="cal-h">Клієнт</div><div class="cal-cc">'+'<span class="av">?</span><span class="t"><b>Без імені</b><small>Швидкий запис — клієнта можна додати пізніше</small></span><button class="btn sm" data-x="chg">Обрати</button></div>';
     }else{
@@ -915,13 +1060,17 @@ function bookingForm(root,init,cfg){
     var el=sec('svc');if(!el)return;
     var cats=App.db.cats;
     el.innerHTML='<div class="cal-h">Послуги</div><div data-sel></div>'+
-      '<div class="inp-ic" style="margin-top:8px">'+I('search')+'<input class="inp" placeholder="Знайти послугу…" data-q autocomplete="off"></div>'+
+      '<button class="btn sm cal-svmore" data-x="svcmore" hidden>'+I('plus','s')+'Ще послуга</button>'+
+      '<div data-svpick><div class="inp-ic" style="margin-top:8px">'+I('search')+'<input class="inp" placeholder="Знайти послугу…" data-q autocomplete="off"></div>'+
       '<div class="chips cal-cats scroll"><button class="chip" aria-pressed="true" data-cat="">Усі</button>'+cats.map(function(c){return '<button class="chip" aria-pressed="false" data-cat="'+c.id+'">'+esc(c.n)+'</button>'}).join('')+'</div>'+
-      '<div class="cal-svlist" data-list></div>';
+      '<div class="cal-svlist" data-list></div></div>';
     rSel();rList();
   }
+  /* телефон: коли послугу обрано, довгий список ховаємо за «Ще послуга» — час одразу під рукою */
+  function svcFold(){var pk=root.querySelector('[data-svpick]'),mb=root.querySelector('[data-x=svcmore]');if(!pk||!mb)return;
+    var fold=window.matchMedia('(max-width:899px)').matches&&st.items.length>0&&!st.svcOpen;pk.hidden=fold;mb.hidden=!fold}
   function rSel(){
-    var el=root.querySelector('[data-sel]');if(!el)return;
+    var el=root.querySelector('[data-sel]');if(!el)return;svcFold();
     if(!st.items.length){el.innerHTML='<div class="cal-hint">Оберіть одну чи кілька послуг зі списку нижче.</div>';return}
     el.innerHTML=st.items.map(function(x,i){var s=App.svc(x.svc);return '<div class="cal-sr"><div class="n"><b class="ell">'+esc(s?s.n:x.svc)+'</b><small>'+esc(s?catName(s.cat):'')+'</small></div>'+
       '<label class="inp-suf"><input type="number" inputmode="numeric" min="5" step="5" data-f="d" data-i="'+i+'" value="'+x.d+'" aria-label="Тривалість"><span>хв</span></label>'+
@@ -951,6 +1100,7 @@ function bookingForm(root,init,cfg){
       (mm.other.length&&mm.fit.length?'<optgroup label="За спеціалізацією">'+mm.fit.map(opt).join('')+'</optgroup><optgroup label="Інші майстри">'+mm.other.map(opt).join('')+'</optgroup>':mastersAll().map(opt).join(''))+'</select></label>'+
       '<label class="fld"><span>Дата</span><input class="inp" type="date" data-f="date" value="'+st.date+'"></label></div>'+
       '<div class="cal-dq"><button class="chip" data-x="dd" data-n="0">Сьогодні</button><button class="chip" data-x="dd" data-n="1">Завтра</button><button class="chip" data-x="dd" data-n="-7">−тиждень</button><button class="chip" data-x="dd" data-n="7">+тиждень</button></div>'+
+      (st.items.length&&st.items[0].svc?'<div class="cal-nf" data-nf><button class="btn sm" data-x="nfgo">'+I('zap','s')+'Найближче вільне</button></div>':'')+
       '<div class="cal-slots" data-slots></div>';
     rSlots();
   }
@@ -1015,19 +1165,29 @@ function bookingForm(root,init,cfg){
     if(cat){st.cat=cat.dataset.cat;$$('[data-cat]',root).forEach(function(c){c.setAttribute('aria-pressed',c===cat)});rList();return}
     if(!b)return;var x=b.dataset.x;
     if(x==='chg'){st.client=null;st.noName=false;rClient()}
+    else if(x==='last'){var lv=st.client&&lastVisit(st.client);if(!lv)return;
+      if(!cfg.noAny&&lv.staff&&App.staff(lv.staff)&&App.staff(lv.staff).works!==false)st.staff=lv.staff;
+      st.items=copyItems(lv.items).map(function(it){var s=App.svc(it.svc);return s?{svc:s.id,price:App.priceFor(s,staffObj()),d:s.d}:it});
+      rClient();rSel();rList();rWhen();rExtra();rSum()}
     else if(x==='noname'){st.client=null;st.noName=true;rClient();rSum()}
-    else if(x==='add'){var s=App.svc(b.dataset.id);var was=!st.items.length;st.items.push({svc:s.id,price:App.priceFor(s,staffObj()),d:s.d});
+    else if(x==='svcmore'){st.svcOpen=true;svcFold();var qi=root.querySelector('[data-svpick] [data-q]');if(qi)qi.focus()}
+    else if(x==='add'){var s=App.svc(b.dataset.id);var was=!st.items.length;st.items.push({svc:s.id,price:App.priceFor(s,staffObj()),d:s.d});st.svcOpen=false;
       rSel();rList();rWhen();rExtra();rSum();
+      if(window.matchMedia('(max-width:899px)').matches){var wsec=sec('when');if(wsec&&wsec.scrollIntoView)wsec.scrollIntoView({block:'start'})}
       if(was&&st.staff==='any'){/* підказка */}}
     else if(x==='del'){st.items.splice(+b.dataset.i,1);rSel();rList();rWhen();rExtra();rSum()}
     else if(x==='slot'){st.start=+b.dataset.t;$$('.cal-sb',root).forEach(function(s){s.setAttribute('aria-pressed',+s.dataset.t===st.start)});var tm=root.querySelector('[data-f=time]');if(tm)tm.value=hmp(st.start);rSum()}
     else if(x==='dd'){var n=+b.dataset.n;st.date=n===0||n===1?D.add(T,n):D.add(st.date,n);rWhen();rSum()}
+    else if(x==='nfgo'){var box=root.querySelector('[data-nf]');var sid=st.items[0]&&st.items[0].svc;if(!box||!sid)return;
+      var r=App.nextFree(sid,{staff:st.staff!=='any'?st.staff:undefined,n:5});
+      box.innerHTML=r.length?'<span class="cal-nf-l">Найближче вільне</span>'+r.map(function(x){var m=App.staff(x.staff);return '<button class="chip" data-x="nf" data-d="'+x.date+'" data-t="'+x.start+'" data-m="'+x.staff+'">'+esc(nfDay(x.date))+' '+hmp(x.start)+' · '+esc(m.short.split(' ')[0])+'</button>'}).join(''):'<span class="mute">Найближчі 2 тижні вільного часу немає</span>'}
+    else if(x==='nf'){st.date=b.dataset.d;st.start=+b.dataset.t;st.staff=b.dataset.m;rWhen();rSum();UI.toast('Обрано: '+nfDay(st.date)+' '+hmp(st.start))}
     else if(x==='sug'){st.date=b.dataset.d;st.start=+b.dataset.t;if(st.staff==='any'){/* лишаємо any */}else st.staff=b.dataset.m;rWhen();rSum()}
     else if(x==='deprule'){st.deposit=depositRule(st.client,total());rExtra()}
   });
   root.addEventListener('input',function(e){
     var t=e.target,f=t.dataset.f;
-    if(t.matches('[data-q]')){st.q=t.value;rList();return}
+    if(t.matches('[data-q]')){if(t.closest('[data-sec=svc]')){st.q=t.value;rList()}return}
     if(!f)return;
     if(f==='d'||f==='price'){var it=st.items[+t.dataset.i];if(!it)return;it[f]=Math.max(0,+t.value||0);if(f==='price')it.custom=true;
       if(f==='d'){rSlots()}rExtra&&0;rSum()}
@@ -1081,6 +1241,7 @@ App.newAppt=function(o){
         pa.hidden=tab!=='appt';pb.hidden=tab!=='block';ok.textContent=tab==='appt'?'Записати':'Заблокувати';
         if(tab==='block'&&!bform)bform=blockForm(pb,init);
       }});
+      if(o.block){var tb=el.querySelector('[data-t=block]');if(tb)tb.click()}
       ok.onclick=function(){
         if(tab==='block'){var r=bform.get();if(r.error)return toastErr(r.error);
           var cs=App.conflicts(r.staff,r.date,r.start,r.dur).filter(function(c){return c.type==='overlap'});
@@ -1092,7 +1253,7 @@ App.newAppt=function(o){
         var fin=function(){
           var a=App.ops.createAppt({staff:r2.staff,date:r2.date,start:r2.start,items:r2.items,client:r2.client,status:r2.confirmed?'confirmed':'new',src:r2.src,note:r2.note,deposit:r2.deposit});
           if(r2.deposit>0&&r2.depPaid)App.ops.addPayment({appt:a.id,kind:'deposit',method:r2.depMethod,amount:r2.deposit,staff:r2.staff});
-          if(o.wait){App.ops.removeWaitlist(o.wait)}
+          if(o.wait){if(App.ops.waitSet)App.ops.waitSet(o.wait,'booked');else App.ops.removeWaitlist(o.wait)}
           close();
           UI.toast('Запис створено · '+hmp(r2.start)+' '+App.staff(r2.staff).short.split(' ')[0],{undo:function(){App.ops.deleteAppt(a.id)}});
           afterCreate(r2.date);
@@ -1133,13 +1294,14 @@ function blockForm(root,init){
 }
 
 /* ═════════ Лист очікування ═════════ */
-function waitlistForm(){
-  var st={client:null,svc:'',staff:'',from:S.d<App.today()?App.today():S.d,to:D.add(S.d<App.today()?App.today():S.d,7),note:''};
+function waitlistForm(o){
+  o=o||{};var d0=S.d<App.today()?App.today():S.d;
+  var st={client:o.client||null,svc:o.svc||'',staff:o.staff||'',from:o.from||d0,to:o.to||D.add(o.from||d0,7),note:o.note||''};
   UI.modal({title:'У лист очікування',size:'narrow',
-    body:'<div class="col-f g12"><div data-cl></div><label class="fld"><span>Послуга</span><select class="sel" data-f="svc"><option value="">Будь-яка</option>'+App.db.services.filter(function(s){return s.active!==false}).map(function(s){return '<option value="'+s.id+'">'+esc(s.n)+'</option>'}).join('')+'</select></label>'+
-      '<label class="fld"><span>Майстер</span><select class="sel" data-f="staff"><option value="">Будь-хто</option>'+mastersAll().map(function(m){return '<option value="'+m.id+'">'+esc(m.short)+'</option>'}).join('')+'</select></label>'+
+    body:'<div class="col-f g12"><div data-cl></div><label class="fld"><span>Послуга</span><select class="sel" data-f="svc"><option value="">Будь-яка</option>'+App.db.services.filter(function(s){return s.active!==false}).map(function(s){return '<option value="'+s.id+'"'+(st.svc===s.id?' selected':'')+'>'+esc(s.n)+'</option>'}).join('')+'</select></label>'+
+      '<label class="fld"><span>Майстер</span><select class="sel" data-f="staff"><option value="">Будь-хто</option>'+mastersAll().map(function(m){return '<option value="'+m.id+'"'+(st.staff===m.id?' selected':'')+'>'+esc(m.short)+'</option>'}).join('')+'</select></label>'+
       '<div class="grid2"><label class="fld"><span>З</span><input class="inp" type="date" data-f="from" value="'+st.from+'"></label><label class="fld"><span>До</span><input class="inp" type="date" data-f="to" value="'+st.to+'"></label></div>'+
-      '<label class="fld"><span>Побажання по часу</span><input class="inp" data-f="note" placeholder="Напр. після 17:00"></label></div>',
+      '<label class="fld"><span>Побажання по часу</span><input class="inp" data-f="note" placeholder="Напр. після 17:00" value="'+esc(st.note)+'"></label></div>',
     foot:'<span class="sp"></span><button class="btn" data-no>Скасувати</button><button class="btn pri" data-ok>Додати</button>',
     onMount:function(el,close){
       function drawC(){var box=el.querySelector('[data-cl]');var c=st.client&&cl(st.client);
@@ -1152,14 +1314,13 @@ function waitlistForm(){
       el.querySelector('[data-ok]').onclick=function(){
         if(!st.client)return toastErr('Оберіть клієнта');
         if(st.to<st.from)return toastErr('Дата «До» раніше за «З»');
-        App.ops.setWaitlist({id:U.uid('w'),client:st.client,svc:st.svc,staff:st.staff,from:st.from,to:st.to,note:st.note,created:App.today()});
-        close();UI.toast('Додано до листа очікування');
+        App.ops.setWaitlist({id:U.uid('w'),client:st.client,svc:st.svc,staff:st.staff,from:st.from,to:st.to,note:st.note,created:App.today(),status:'wait'});
+        close();UI.toast('Додано до листа очікування',{ms:3500});
       };
     }});
 }
-function waitlistFind(id){
-  var w=App.db.waitlist.find(function(x){return x.id===id});if(!w)return;
-  var c=cl(w.client),sv=App.svc(w.svc),d=sv?sv.d:60,T=App.today();
+function waitSlots(w){
+  var sv=App.svc(w.svc),d=sv?sv.d:60,T=App.today();
   var after=null,before=null,mm;
   if(mm=/після\s+(\d{1,2})/i.exec(w.note||''))after=+mm[1]*60;
   if(mm=/до\s+(\d{1,2})/i.exec(w.note||''))before=+mm[1]*60;
@@ -1172,11 +1333,76 @@ function waitlistFind(id){
       if(slots.length)res.push({d:day,m:m,slots:slots.slice(0,5),more:Math.max(0,slots.length-5)});
     });
   }
+  return res;
+}
+function waitlistFind(id){
+  var w=App.db.waitlist.find(function(x){return x.id===id});if(!w)return;
+  var c=cl(w.client),sv=App.svc(w.svc),d=sv?sv.d:60;
+  var res=waitSlots(w);
   var body=res.length?'<div class="cal-wfind">'+res.slice(0,12).map(function(r){return '<div class="cal-wfr"><div class="t"><b>'+esc(dShort(r.d))+'</b><small>'+esc(r.m.short)+'</small></div><div class="cal-sgrid">'+r.slots.map(function(t){return '<button class="cal-sb" data-d="'+r.d+'" data-m="'+r.m.id+'" data-t="'+t+'">'+hmp(t)+'</button>'}).join('')+(r.more?'<small class="mute">+'+r.more+'</small>':'')+'</div></div>'}).join('')+'</div>'
     :UI.empty('clock','Вікон поки немає','У вказаний період немає вільного часу для цієї послуги. Спробуйте розширити дати.');
   UI.modal({title:'Знайти вікно',sub:esc((c?c.n:'Без імені')+' · '+(sv?sv.n+' · '+U.dur(d):'будь-яка послуга')+(w.note?' · '+w.note:'')),body:body,size:'narrow',
     onMount:function(el,close){el.addEventListener('click',function(e){var b=e.target.closest('.cal-sb');if(!b)return;close();App.newAppt({staff:b.dataset.m,date:b.dataset.d,start:+b.dataset.t,client:w.client,svc:w.svc||undefined,wait:w.id})})}});
 }
+
+
+/* ═════════ Екран «Лист очікування» (B2.2) ═════════ */
+function wlDays(w){var n=D.diff(w.created||App.today(),App.today());return n<=0?'з сьогодні':'чекає '+n+' '+U.plural(n,'день','дні','днів')}
+function wlWin(w){return (w.from===w.to?dShort(w.from):dShort(w.from)+' – '+dShort(w.to))}
+function wlRow(w,sel){
+  var c=cl(w.client),sv=App.svc(w.svc),m=w.staff&&App.staff(w.staff);
+  return '<button class="wl-r'+(sel?' is-sel':'')+'" data-act="cal-wl-sel" data-id="'+w.id+'" aria-pressed="'+!!sel+'">'+(c?UI.av(c,''):'<span class="av">?</span>')+
+    '<span class="t"><b class="ell">'+esc(c?c.n:'Без імені')+'</b><small class="ell">'+esc(sv?sv.n:'будь-яка послуга')+' · '+esc(m?m.short:'будь-який майстер')+'</small>'+
+    '<small class="ell">'+esc(wlWin(w))+(w.note?' · '+esc(w.note):'')+'</small></span>'+
+    '<span class="wl-m">'+(w.status==='offered'?'<span class="badge warn">Запропоновано</span>':'')+'<small>'+esc(wlDays(w))+'</small></span></button>';
+}
+function wlDetail(w){
+  var c=cl(w.client),sv=App.svc(w.svc),m=w.staff&&App.staff(w.staff),res=waitSlots(w);
+  var h='<div class="wl-d"><div class="wl-dh">'+(c?UI.av(c,''):'')+'<span class="t"><b>'+esc(c?c.n:'Без імені')+'</b><small>'+esc(sv?sv.n+' · '+U.dur(sv.d):'будь-яка послуга')+' · '+esc(m?m.short:'будь-який майстер')+'</small></span></div>'+
+    '<dl class="dl cal-dl"><dt>Вікно</dt><dd>'+esc(wlWin(w))+'</dd><dt>Побажання</dt><dd>'+esc(w.note||'—')+'</dd><dt>У листі</dt><dd>'+esc(wlDays(w))+'</dd>'+(c&&c.ph&&App.canSeePhone()?'<dt>Телефон</dt><dd><a href="tel:+'+c.ph+'">'+esc(App.phoneOf(c))+'</a></dd>':'')+'</dl>';
+  h+='<h4 class="wl-h">Вільні вікна</h4>';
+  if(!res.length)h+=UI.empty('clock','Вікон поки немає','У вказаний період немає вільного часу. Розширте дати або чекайте сигналу — ми підкажемо, коли звільниться.');
+  else h+='<div class="cal-wfind">'+res.slice(0,8).map(function(r){return '<div class="cal-wfr"><div class="t"><b>'+esc(dShort(r.d))+'</b><small>'+esc(r.m.short)+'</small></div><div class="cal-sgrid">'+r.slots.map(function(t){return '<button class="cal-sb" data-act="cal-wl-slot" data-id="'+w.id+'" data-d="'+r.d+'" data-m="'+r.m.id+'" data-t="'+t+'">'+hmp(t)+'</button>'}).join('')+(r.more?'<small class="mute">+'+r.more+'</small>':'')+'</div></div>'}).join('')+'</div>';
+  h+='<div class="wl-acts"><button class="btn dng" data-act="cal-wl-del2" data-id="'+w.id+'">'+I('trash','s')+'Прибрати</button><span class="sp"></span>'+
+    (res.length?'<button class="btn" data-act="cal-wl-offer" data-id="'+w.id+'">'+I('msg','s')+'Запропонувати</button><button class="btn pri" data-act="cal-wl-book" data-id="'+w.id+'">'+I('plus','s')+'Записати</button>':'<button class="btn pri" data-act="cal-wl-book" data-id="'+w.id+'">'+I('plus','s')+'Записати</button>')+'</div></div>';
+  return h;
+}
+function wlList(){return (App.db.waitlist||[]).filter(function(w){var s=w.status||'wait';return s==='wait'||s==='offered'}).sort(function(a,b){return (a.created||'')<(b.created||'')?-1:1})}
+var WL={sel:''};
+App.route('waitlist',{title:'Лист очікування',icon:'clock',nav:true,group:'work',order:3.5,module:'waitlist',perm:'calendar.all',
+  count:function(){return (App.db.waitlist||[]).filter(function(w){return (w.status||'wait')==='wait'}).length||''},
+  render:function(view,params,q){
+    var L=wlList();q=q||{};
+    if(q.id&&L.find(function(w){return w.id===q.id}))WL.sel=q.id;
+    if(!L.find(function(w){return w.id===WL.sel}))WL.sel=isMob()?'':(L[0]||{}).id||'';
+    App.setTop(isMob()?'<button class="icobtn" data-act="cal-wl-add" aria-label="Додати в лист">'+I('plus')+'</button>':'<button class="btn" data-act="cal-wl-add">'+I('plus','s')+'Додати клієнта</button>');
+    if(!L.length){view.innerHTML='<div class="wl wl-empty">'+UI.empty('clock','Ніхто не чекає','Коли зручного часу немає — додайте клієнта сюди, і ми підкажемо, коли звільниться вікно.','<button class="btn pri" data-act="cal-wl-add" style="margin-top:8px">'+I('plus','s')+'Додати клієнта</button>')+'</div>';return}
+    var w=L.find(function(x){return x.id===WL.sel});
+    view.innerHTML='<div class="wl"><div class="wl-list card"><div class="wl-lh"><b>Чекають</b><span class="pill-n">'+L.length+'</span></div>'+L.map(function(x){return wlRow(x,!isMob()&&x.id===WL.sel)}).join('')+'</div>'+
+      (isMob()?'':'<div class="wl-side card">'+(w?wlDetail(w):'')+'</div>')+'</div>';
+  }});
+act('wl-sel',function(el){var id=el.dataset.id;WL.sel=id;
+  if(isMob()){var w=App.db.waitlist.find(function(x){return x.id===id});if(!w)return;var c=cl(w.client);
+    UI.drawer({title:esc(c?c.n:'Лист очікування'),body:wlDetail(w).replace('<div class="wl-acts">','<div class="wl-acts sheet-foot">'),size:'wl-sheet'});return}
+  App.refresh()});
+function wlCloseOv(){if($('.ov'))UI.closeAll()}
+act('wl-slot',function(el){var w=App.db.waitlist.find(function(x){return x.id===el.dataset.id});if(!w)return;wlCloseOv();
+  App.newAppt({staff:el.dataset.m,date:el.dataset.d,start:+el.dataset.t,client:w.client,svc:w.svc||undefined,wait:w.id})});
+act('wl-book',function(el){var w=App.db.waitlist.find(function(x){return x.id===el.dataset.id});if(!w)return;var r=waitSlots(w)[0];wlCloseOv();
+  App.newAppt({staff:r?r.m.id:(w.staff||undefined),date:r?r.d:w.from,start:r?r.slots[0]:undefined,client:w.client,svc:w.svc||undefined,wait:w.id})});
+act('wl-offer',function(el){var w=App.db.waitlist.find(function(x){return x.id===el.dataset.id});if(!w)return;var c=cl(w.client),r=waitSlots(w)[0];
+  if(!c)return toastErr('Клієнта не знайдено');
+  var fake={client:c.id,items:w.svc?[{svc:w.svc}]:[],staff:r?r.m.id:w.staff,date:r?r.d:w.from,start:r?r.slots[0]:0};
+  var txt=fillTpl('wait',fake),ch=c.tg?'tg':c.ph?'viber':'';
+  if(!ch)return UI.toast('У клієнта немає Telegram/Viber — зателефонуйте',{type:'err'});
+  UI.modal({title:'Запропонувати вікно',sub:esc(c.n)+' · '+(ch==='tg'?'Telegram':'Viber'),size:'narrow cal-nc',body:'<div class="bubble me">'+esc(txt)+'</div>',
+    foot:'<span class="sp"></span><button class="btn" data-no>Ні</button><button class="btn pri" data-ok>'+I('msg','s')+'Надіслати</button>',
+    onMount:function(m,close){m.querySelector('[data-no]').onclick=close;m.querySelector('[data-ok]').onclick=function(){
+      App.ops.sendMsg({client:c.id,ch:ch,tpl:'wait',txt:txt});App.ops.waitSet(w.id,'offered');close();wlCloseOv();UI.toast('Пропозицію надіслано · '+esc(U.short(c.n)))}}});
+});
+act('wl-del2',function(el){var id=el.dataset.id;var w=App.db.waitlist.find(function(x){return x.id===id});if(!w)return;var c=cl(w.client);
+  UI.confirm({title:'Прибрати з листа?',text:esc(c?c.n:'Клієнт')+' більше не чекатиме вільного вікна.',ok:'Прибрати',danger:true}).then(function(y){if(!y)return;
+    var prev=w.status||'wait';App.ops.waitSet(id,'removed');wlCloseOv();UI.toast('Прибрано з листа очікування',{undo:function(){App.ops.waitSet(id,prev)}})})});
 
 /* ═════════ App.openAppt — картка запису (drawer) ═════════ */
 var DR=null; /* поточний drawer: {id,el,render} */
@@ -1203,15 +1429,18 @@ App.openAppt=function(id){
     h3.innerHTML=esc(cname(a))+'<small>'+esc(D.human(a.date,{wd:true}))+' · '+hmp(a.start)+'–'+hmp(App.apptEnd(a))+'</small>';
     var h='<div class="cal-d">';
     /* стан */
-    h+='<div class="cal-d-top">'+UI.badge(a.status)+(a.status==='new'?'<span class="mute">Клієнт ще не підтвердив візит</span>':'')+
+    h+='<div class="cal-d-top">'+UI.badge(a.status)+(a.clientOk?'<span class="cal-cok">'+I('check','s')+'клієнт підтвердив</span>':a.status==='new'?'<span class="mute">Клієнт ще не підтвердив візит</span>':'')+
+       (needDeposit(a)?'<span class="badge warn">Очікує передоплати</span><span class="mute">тримаємо слот ще '+(((App.db.settings.deposit||{}).holdMin)||24)+' хв</span>':'')+
        (isLate(a)?'<span class="badge dng">Запізнюється</span>':'')+
        (c&&st&&st.visits===0&&a.status!=='done'?'<span class="badge plain">Перший візит</span>':'')+
        (a.status==='cancelled'&&a.cancelReason?'<span class="mute">'+esc(a.cancelReason)+(a.lateCancel?' · пізнє скасування':'')+'</span>':'')+'</div>';
     /* клієнт */
     if(c){
-      h+='<div class="cal-d-cl"><button class="cal-cc click" data-d="client">'+UI.av(c,'')+'<span class="t"><b>'+esc(c.n)+(c.tags.indexOf('vip')>=0?' <span class="tag">VIP</span>':'')+'</b><small>'+(c.ph?esc(U.phone(c.ph)):'без телефону')+'</small></span>'+I('right','s')+'</button>'+
-        '<div class="cal-d-ca">'+(c.ph?'<a class="btn sm" href="tel:+'+c.ph+'">'+I('phone','s')+'Подзвонити</a>':'')+(c.ph&&c.tg?'<a class="btn sm" href="https://t.me/+'+c.ph+'" target="_blank" rel="noopener">'+I('tg','s')+'Telegram</a>':'')+'<button class="btn sm" data-d="client">'+I('user','s')+'Профіль</button></div>'+
-        '<div class="cal-d-st"><span><b>'+st.visits+'</b> '+U.plural(st.visits,'візит','візити','візитів')+'</span><span><b'+(st.noshow?' class="warn-t"':'')+'>'+st.noshow+'</b> не прийшов</span><span>Останній: <b>'+(st.last?esc(D.shortH(st.last.date)):'—')+'</b></span>'+(st.spent?'<span>Витратив(ла): <b>'+U.uah(st.spent)+'</b></span>':'')+'</div>'+
+      var seePh=App.canSeePhone(),rk=App.apptRisks(a),nx=st.next&&st.next.id!==a.id?st.next:null;
+      h+='<div class="cal-d-cl"><button class="cal-cc click" data-d="client">'+UI.av(c,'')+'<span class="t"><b>'+esc(c.n)+(c.tags.indexOf('vip')>=0?' <span class="tag">VIP</span>':'')+'</b><small>'+(c.ph?(seePh?esc(App.phoneOf(c)):'телефон приховано'):'без телефону')+'</small></span>'+risksHtml(a)+I('right','s')+'</button>'+
+        (rk.length?'<div class="cal-d-rk">'+rk.map(function(x){var m=RISK_IC[x.k]||['info',''];return '<span class="risk-l">'+I(m[0],m[1])+esc(x.t)+'</span>'}).join('')+'</div>':'')+
+        '<div class="cal-d-ca">'+(c.ph&&c.tg?'<a class="btn sm" href="tg://resolve?phone='+c.ph+'">'+I('tg','s')+'Telegram</a>':'')+(c.ph?'<a class="btn sm" href="viber://chat?number=%2B'+c.ph+'">'+I('msg','s')+'Viber</a>':'')+(c.ph&&seePh?'<a class="btn sm" href="tel:+'+c.ph+'">'+I('phone','s')+'Подзвонити</a>':'')+'</div>'+
+        '<div class="cal-d-st"><span>Останній: <b>'+(st.last?esc(D.shortH(st.last.date)):'—')+'</b></span><span>Наступний: <b>'+(nx?esc(D.shortH(nx.date))+' '+hmp(nx.start):'—')+'</b></span><span><b>'+st.visits+'</b> '+U.plural(st.visits,'візит','візити','візитів')+'</span>'+(st.noshow?'<span><b class="warn-t">'+st.noshow+'</b> не прийшов</span>':'')+'</div>'+
         (c.blocked?'<div class="note dng">'+I('ban')+'<span>Клієнт у чорному списку.</span></div>':'')+
         (c.tags.indexOf('allergy')>=0||c.note?'<div class="note warn">'+I('alert')+'<span>'+(c.tags.indexOf('allergy')>=0?'<b>Алергія. </b>':'')+esc(c.note||'')+'</span></div>':'')+'</div>';
     }else h+='<div class="cal-d-cl"><div class="cal-cc"><span class="av">?</span><span class="t"><b>Без імені</b><small>Швидкий запис</small></span><button class="btn sm" data-d="setclient">Обрати клієнта</button></div></div>';
@@ -1246,27 +1475,39 @@ App.openAppt=function(id){
     acts.push(['repeat','Повторити запис','repeat']);acts.push(['dup','Дублювати','copy']);
     if(a.status==='done')acts.push(['edit','Редагувати','edit']);
     acts.push(['del','Видалити','trash',1]);
-    h+='<section class="cal-d-s"><h4>Дії</h4><div class="cal-d-acts">'+acts.map(function(x){return '<button class="btn'+(x[3]?' dng-o':'')+'" data-d="'+x[0]+'">'+I(x[2],'s')+x[1]+'</button>'}).join('')+'</div></section>';
+    DRACTS=acts;
     /* історія */
     var ev=(a.events||[]).slice().reverse();
     if(ev.length)h+='<section class="cal-d-s"><h4>Історія</h4><div class="cal-d-hist">'+ev.map(function(e){return '<div class="r"><i></i><span>'+esc(e.txt)+'<small>'+esc(fmtTs(e.ts))+' · '+esc(whoName(e.who))+'</small></span></div>'}).join('')+'</div></section>';
     body.innerHTML=h+'</div>';
     /* футер */
     var f='';
-    if(a.status==='new')f='<button class="btn" data-d="st" data-s="arrived">Прийшов(ла)</button><button class="btn pri big" data-d="st" data-s="confirmed">'+I('check')+'Підтвердити</button>';
+    var more='<button class="icobtn cal-dmore" data-d="more" aria-label="Інші дії" title="Перенести, скасувати, повторити…">'+I('more')+'</button>';
+    if(a.status==='new')f='<button class="btn pri big" data-d="st" data-s="confirmed">'+I('check')+'Підтвердити</button>';
     else if(a.status==='confirmed')f='<button class="btn pri big" data-d="st" data-s="arrived">'+I('check')+'Прийшов(ла)</button>';
     else if(a.status==='arrived')f=canPay()?'<button class="btn pri big" data-d="pay">'+I('wallet')+'Оплата · '+U.uah(Math.max(0,total-paid))+'</button>':'<span class="mute">Оплату приймає адміністратор</span>';
-    else if(a.status==='done')f='<button class="btn" data-d="receipt">'+I('receipt')+'Чек</button>'+(due>0&&canPay()?'<button class="btn pri big" data-d="pay">Доплатити '+U.uah(due)+'</button>':'<button class="btn pri big" data-d="repeat">'+I('repeat')+'Записати знову</button>');
+    else if(a.status==='done')f=(due>0&&canPay()?'<button class="btn pri big" data-d="pay">Доплатити '+U.uah(due)+'</button>':'<button class="btn pri big" data-d="repeat">'+I('repeat')+'Записати знову</button>');
     else if(a.status==='noshow')f='<span class="mute">Клієнт не прийшов</span>';
     else f='<span class="mute">Запис скасовано</span>';
-    foot.innerHTML=f;
+    foot.innerHTML=more+f;
   }
+  var DRACTS=[];
   DR={id:id,el:el,render:render};
   render();
   function onClick(e){
     var b=e.target.closest('[data-d]');if(!b)return;var k=b.dataset.d,a=App.appt(id);if(!a)return;
     if(k==='client'){var cid=a.client;drawer.close();App.openClient(cid)}
     else if(k==='setclient'){pickClientModal(a)}
+    else if(k==='more'){var L=[];
+      if(a.status==='new')L.push({ic:'check',t:'Прийшов(ла)',fn:function(){setStatus(a,'arrived')}});
+      if(a.status==='done')L.push({ic:'receipt',t:'Чек',fn:function(){showReceipt(id)}});
+      DRACTS.forEach(function(x){if(x[0]==='move'){L.push({ic:'move',t:'Перенести (обрати в календарі)',fn:function(){App.moveAppt(id)}});L.push({ic:'cal',t:'Перенести (форма)',fn:function(){rescheduleAppt(App.appt(id))}});return}
+        L.push({ic:x[2],t:x[1],dng:!!x[3]||x[0]==='cancel',fn:function(){onClick({target:{closest:function(){return {dataset:{d:x[0]}}}}})}})});
+      if(a.client&&(a.status==='new'||a.status==='confirmed')){L.push('-');
+        L.push({ic:'spark',t:'Демо: клієнт відповів «Так»',fn:function(){App.ops.simReply(id,'yes');UI.toast('Клієнт підтвердив запис')}});
+        L.push({ic:'spark',t:'Демо: клієнт просить перенести',fn:function(){App.ops.simReply(id,'move');UI.toast('Клієнт просить перенести — сповіщення в дзвіночку')}});
+        L.push({ic:'spark',t:'Демо: клієнт скасував',fn:function(){var fr={staff:a.staff,date:a.date,start:a.start,dur:App.apptDur(a)};App.ops.simReply(id,'no');UI.toast('Клієнт скасував у месенджері');waitSignal(fr)}});}
+      UI.menu(b,L)}
     else if(k==='st'){setStatus(a,b.dataset.s)}
     else if(k==='pay'){App.checkout(id)}
     else if(k==='receipt'){showReceipt(id)}
@@ -1275,7 +1516,7 @@ App.openAppt=function(id){
     else if(k==='noshow')markNoshow(a);
     else if(k==='cancel')cancelAppt(a);
     else if(k==='restore')setStatus(a,'confirmed');
-    else if(k==='repeat')repeatMenu(b,a);
+    else if(k==='repeat')repeatMenu(b.getBoundingClientRect?b:el.querySelector('.cal-dmore'),a);
     else if(k==='dup')App.newAppt({items:a.items,client:a.client,staff:a.staff,date:a.date,start:Math.min(1380,App.apptEnd(a)),note:a.note});
     else if(k==='del')deleteAppt(a,drawer);
     else if(k==='note')editNote(a);
@@ -1317,8 +1558,9 @@ function cancelAppt(a){
       var rf=el.querySelector('[data-ref]');if(rf)rf.onchange=function(){st.refund=rf.checked};
       el.querySelector('[data-no]').onclick=close;
       el.querySelector('[data-ok]').onclick=function(){
-        var prev=a.status;
+        var prev=a.status,freed={staff:a.staff,date:a.date,start:a.start,dur:App.apptDur(a)};
         App.ops.setStatus(a.id,'cancelled',{reason:st.reason||'Без причини',late:st.late});
+        setTimeout(function(){afterChange(App.appt(a.id)||a,'cancel',freed)},30);
         if(st.refund&&dep>0){var dp=App.apptPays(a).filter(function(p){return p.kind==='deposit'&&p.amount>0})[0];App.ops.refund(a.id,dep,dp?dp.method:'cash','Скасування запису')}
         close();
         UI.toast('Запис скасовано'+(st.refund&&dep?' · передоплату повернено':''),st.refund&&dep?{}:{undo:function(){App.ops.setStatus(a.id,prev)}});
@@ -1396,7 +1638,8 @@ function rescheduleAppt(a){
         var r=form.get();if(r.error)return toastErr(r.error);
         var cs=App.conflicts(r.staff,r.date,r.start,App.apptDur(a),a.id);
         var old={staff:a.staff,date:a.date,start:a.start};
-        var go2=function(){App.ops.updateAppt(a.id,{staff:r.staff,date:r.date,start:r.start});close();
+        var go2=function(){App.ops.updateAppt(a.id,{staff:r.staff,date:r.date,start:r.start});close();S.move='';
+          afterChange(a,'move',{staff:old.staff,date:old.date,start:old.start,dur:App.apptDur(a)});
           UI.toast('Перенесено: '+D.shortH(r.date)+' '+hmp(r.start),{undo:function(){App.ops.updateAppt(a.id,old,'Перенесення скасовано')}});
           if(App.cur&&App.cur.rt.id==='calendar'&&S.v==='day'&&r.date!==S.d)go({d:r.date})};
         if(cs.length)askConflict(cs).then(function(y){if(y)go2()});else go2();
@@ -1607,19 +1850,46 @@ App.checkout=function(id){
       };
     }});
 };
+function rebookOpts(a){
+  var st=a.client?App.clientStats(a.client):null,wk=st&&st.avgGap?Math.max(1,Math.min(12,Math.round(st.avgGap/7))):4;
+  var sid=a.items[0]&&a.items[0].svc,res=[];
+  [wk-1,wk,wk+1].forEach(function(n){if(n<1)return;var from=D.add(a.date,n*7);
+    var r=sid?App.nextFree(sid,{staff:a.staff,from:from,n:1}):[];
+    res.push({n:n,date:r[0]?r[0].date:from,start:r[0]?r[0].start:a.start,staff:a.staff,ok:!!r[0]})});
+  return {wk:wk,list:res};
+}
 function showDone(el,close,id,info){
   var a=App.appt(id),c=a.client&&cl(a.client);
   el.querySelector('.modal-h h3').innerHTML='Оплачено<small>'+esc(cname(a))+'</small>';
-  el.querySelector('.modal-b').innerHTML='<div class="cal-done"><span class="cal-done-ic">'+I('check','xl')+'</span><h2>'+U.uah(App.apptTotal(a))+'</h2><p>Візит завершено'+(info.tip?' · чайові '+U.uah(info.tip):'')+'</p>'+
+  var rb=c&&!a.block?rebookOpts(a):null;
+  el.querySelector('.modal-b').innerHTML='<div class="cal-done"><span class="cal-done-ic">'+I('check','xl')+'</span><h2>Оплачено ✓ '+U.uah(App.apptTotal(a))+'</h2><p>Візит завершено'+(info.tip?' · чайові '+U.uah(info.tip):'')+'</p>'+
     (info.change?'<div class="cal-done-chg">Решта клієнту: <b>'+U.uah(info.change)+'</b></div>':'')+
-    '<div class="cal-done-a"><button class="btn" data-receipt>'+I('receipt')+'Чек</button><button class="btn" data-next>'+I('repeat')+'Записати на наступний раз</button></div></div>';
+    (rb?'<div class="cal-rb" data-rb><h4>Записати знову</h4><p class="mute">'+esc(c.n.split(' ')[0])+' зазвичай приходить раз на '+rb.wk+' '+U.plural(rb.wk,'тиждень','тижні','тижнів')+'</p><div class="cal-rb-c">'+
+      rb.list.map(function(o,k){return '<button class="btn acc cal-rb-b" data-rbk="'+k+'"><b>через '+o.n+' '+U.plural(o.n,'тиждень','тижні','тижнів')+'</b><small>'+esc(dShort(o.date))+' · '+hmp(o.start)+(o.ok?'':' (зайнято)')+'</small></button>'}).join('')+
+      '</div><div class="cal-rb-a"><button class="btn sm" data-rbother>'+I('cal','s')+'Обрати інший час</button><button class="btn sm" data-rbno>Клієнт відмовився</button></div></div>':'')+
+    '<div class="cal-done-a"><button class="btn" data-receipt>'+I('receipt')+'Чек</button>'+(rb?'':'<button class="btn" data-next>'+I('repeat')+'Записати на наступний раз</button>')+'</div></div>';
   var f=el.querySelector('.modal-f');f.innerHTML='<span class="sp"></span><button class="btn pri big" data-fin>Готово</button>';
   el.querySelector('[data-fin]').onclick=close;
   el.querySelector('[data-receipt]').onclick=function(){showReceipt(id)};
-  el.querySelector('[data-next]').onclick=function(){
+  var nx=el.querySelector('[data-next]');if(nx)nx.onclick=function(){
     var w=4,aa=App.appt(id);close();
     App.newAppt({items:aa.items,client:aa.client,staff:aa.staff,date:D.add(aa.date,w*7),start:aa.start});
   };
+  if(rb){
+    var box=el.querySelector('[data-rb]');
+    box.addEventListener('click',function(e){
+      var b=e.target.closest('[data-rbk]');
+      if(b){var o=rb.list[+b.dataset.rbk],aa=App.appt(id);
+        var cs=App.conflicts(o.staff,o.date,o.start,App.apptDur(aa));
+        var mk=function(){var na=App.ops.createAppt({staff:o.staff,date:o.date,start:o.start,items:copyItems(aa.items),client:aa.client,status:'confirmed',src:'admin'});
+          var nid=(na&&na.id)||na;aa.rebook='booked:'+nid;App.save();
+          box.innerHTML='<div class="cal-rb-ok">'+I('check','s')+'<span>Записано на <b>'+esc(dShort(o.date))+' '+hmp(o.start)+'</b> · '+esc(App.staff(o.staff).short)+'</span></div>';
+          UI.toast('Наступний візит: '+dShort(o.date)+' '+hmp(o.start),{undo:function(){App.ops.deleteAppt(nid);delete aa.rebook;App.save()}})};
+        if(cs.length)askConflict(cs,'Все одно записати').then(function(y){if(y)mk()});else mk();return}
+      if(e.target.closest('[data-rbother]')){var aa2=App.appt(id);close();App.newAppt({items:aa2.items,client:aa2.client,staff:aa2.staff,date:D.add(aa2.date,rb.wk*7),start:aa2.start});return}
+      if(e.target.closest('[data-rbno]')){var aa3=App.appt(id);aa3.rebook='declined';App.save();box.innerHTML='<div class="cal-rb-ok mute"><span>Добре, нагадаємо клієнту пізніше</span></div>';UI.toast('Позначено: клієнт відмовився від запису')}
+    });
+  }
   UI.toast('Оплату проведено · '+U.uah(App.apptTotal(a)));
 }
 

@@ -1,0 +1,74 @@
+/* Slotly demo · mod/shell.css (B1) — Ctrl+K v2, дзвіночок, сповіщення, лист «Створити», плашка офлайн.
+   Тільки токени з assets/tokens.css. Префікс .sh- */
+
+/* ── Ctrl+K ── */
+.cmdk .sh-ct{display:flex;flex-direction:column;min-width:0;flex:1;text-align:left;gap:1px}
+.cmdk .sh-ctt{font-weight:500;color:var(--ink)}
+.cmdk .sh-ctt b{font-weight:700}
+.cmdk .it small{margin-left:0;font-size:12px;color:var(--mute)}
+.cmdk .it kbd{margin-left:auto}
+.sh-cic{width:28px;height:28px;border-radius:var(--r-sm);background:var(--soft);display:grid;place-items:center;flex:none;color:var(--ink-2)}
+.sh-cic .i{width:16px;height:16px}
+.sh-cempty{padding:28px 16px;text-align:center;color:var(--mute);display:flex;flex-direction:column;gap:4px}
+.sh-cempty b{color:var(--ink);font-weight:600}
+.sh-cfoot{display:flex;gap:16px;padding:8px 16px;border-top:1px solid var(--line);font-size:12px;color:var(--mute)}
+.sh-cfoot kbd{margin-right:3px}
+.cmdk .q .sh-cx{height:44px;padding:0 6px;color:var(--ink-2)}
+
+/* ── шпаргалка клавіш ── */
+.sh-keys td{height:36px}
+.sh-keys td:first-child{width:1%;white-space:nowrap}
+
+/* ── вкладки сповіщень (aria-selected) ── */
+.sh-ntabs{margin:0 0 8px}
+.sh-ntabs [aria-selected=true]{background:var(--bg);box-shadow:var(--sh-1),inset 0 0 0 1px var(--line);color:var(--ink);font-weight:600}
+
+/* ── поповер дзвіночка 380 px ── */
+.sh-pop{position:fixed;z-index:var(--z-toast);width:380px;max-width:calc(100vw - 16px);background:var(--bg);border:1px solid var(--line-strong);border-radius:var(--r-lg);box-shadow:var(--sh-3);padding:12px;animation:popIn .14s var(--ease)}
+.sh-pop-h{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.sh-pop-h b{font-weight:600;font-size:var(--t-md)}
+.sh-pop .sh-nlist{max-height:min(60vh,420px);overflow-y:auto;margin:0 -4px}
+.sh-pop-f{display:flex;align-items:center;gap:8px;border-top:1px solid var(--line);margin:8px -12px -4px;padding:8px 8px 0}
+
+/* ── рядок сповіщення ── */
+.sh-n{display:grid;grid-template-columns:28px minmax(0,1fr) auto;align-items:start;gap:10px;width:100%;padding:9px 8px 9px 14px;border-radius:var(--r-sm);text-align:left;position:relative;min-height:44px}
+.sh-n:hover{background:var(--soft)}
+.sh-n.un::before{content:"";position:absolute;left:3px;top:19px;width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.sh-nic{width:28px;height:28px;border-radius:var(--r-sm);background:var(--soft);display:grid;place-items:center;color:var(--ink-2)}
+.sh-nic .i{width:15px;height:15px}
+.sh-nt{font-size:13px;line-height:1.4;color:var(--ink-2);padding-top:4px;overflow-wrap:anywhere}
+.sh-n.un .sh-nt{color:var(--ink);font-weight:500}
+.sh-ntm{font-size:12px;color:var(--mute);white-space:nowrap;padding-top:5px}
+.sh-nempty{display:flex;flex-direction:column;align-items:center;gap:6px;padding:28px 16px;text-align:center;color:var(--mute)}
+.sh-nempty b{color:var(--ink);font-weight:600}
+.sh-npage .sh-nlist{padding:4px}
+.sh-npage .sh-nlist .sh-n+.sh-n{border-top:1px solid var(--line);border-radius:0}
+
+/* ── лист «Створити» ── */
+.sh-create{display:flex;flex-direction:column;margin:-6px -8px}
+.sh-ci{display:flex;align-items:center;gap:14px;min-height:56px;padding:8px 10px;border-radius:var(--r-md);text-align:left;width:100%}
+.sh-ci:hover{background:var(--soft)}
+.sh-ci .sh-cic{width:36px;height:36px;border-radius:var(--r-md)}
+.sh-ci .sh-cic .i{width:18px;height:18px}
+.sh-ci .sh-ct{display:flex;flex-direction:column;min-width:0;flex:1}
+.sh-ci b{font-weight:600;font-size:var(--t-md);color:var(--ink)}
+.sh-ci small{color:var(--mute);font-size:13px}
+.sh-ci kbd{margin-left:auto}
+
+/* ── плашка офлайн (N5) ── */
+.banner.off{position:relative}
+.banner.off .i{flex:none}
+
+@media (max-width:899px){
+  .sh-pop{display:none}
+  .sh-npage .page-h .btn{height:44px}
+  .sh-ntabs{display:flex;width:100%}
+  .sh-ntabs button{flex:1;height:38px}
+  .sh-n{padding:12px 8px 12px 16px}
+  .sh-npage .sh-nlist{border-radius:var(--r-md)}
+  .sh-npage [data-nset]{height:44px}
+  .sh-sheet .modal-b{padding-bottom:calc(16px + env(safe-area-inset-bottom))}
+  .cmdk .q{padding:0 8px 0 16px}
+  .banner.off,.banner.air,.banner.warn{padding:8px 12px;gap:8px}
+  .banner .btn{height:36px}
+}

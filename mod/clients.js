@@ -9,7 +9,8 @@ var U=App.u,D=App.d,UI=App.ui,O=App.ops,$=U.$,esc=U.esc,NB='\u00A0',I=App.icon;
 
 /* ═════════ довідники ═════════ */
 var SRC={ig:'Instagram',online:'Онлайн-запис',phone:'Дзвінок',walkin:'Без запису',friend:'Рекомендація',tg:'Telegram',import:'Імпорт',admin:'Адміністратор'};
-var SEGS=[['all','Усі'],['new','Нові'],['active','Активні'],['regular','Постійні'],['lost','Давно не були 60+'],['bday','Іменинники тижня'],['blocked','Чорний список']];
+var SEGS=[['all','Усі'],['new','Нові'],['regular','Постійні'],['lost','Давно не були 60+'],['bday','Іменинники тижня'],['debt','Борг'],['blocked','Чорний список']];
+function debtOf(r){if(r.debt==null)r.debt=App.clientDebt(r.c.id)||0;return r.debt}
 var PAGE=50;
 function srcName(s){return SRC[s]||App.SRC[s]||s||'—'}
 function isFull(){return App.can('clients.view')}
@@ -103,7 +104,7 @@ function baseOK(r){var c=r.c;
     if(/^[\d+\s()-]+$/.test(q)){var dg=q.replace(/\D/g,'');if(dg.length<2)return false;if(dg[0]==='0')dg=dg.slice(1);return (c.ph||'').indexOf(dg)>=0}
     var toks=q.split(/\s+/);for(var i=0;i<toks.length;i++)if(r.text.indexOf(toks[i])<0)return false}
   return true}
-function segOK(r,seg){switch(seg){case 'all':return true;case 'bday':return r.bd!=null&&r.bd<=6;case 'lostreg':return r.seg==='lost'&&r.st.visits>=2;default:return r.seg===seg}}
+function segOK(r,seg){switch(seg){case 'all':return true;case 'bday':return r.bd!=null&&r.bd<=6;case 'lostreg':return r.seg==='lost'&&r.st.visits>=2;case 'debt':return debtOf(r)>0;case 'blocked':return !!r.c.blocked||r.seg==='blocked';default:return r.seg===seg}}
 var SORT={last:function(r){return r.st.lastDate||''},spent:function(r){return r.st.spent},visits:function(r){return r.st.visits},name:function(r){return r.text},avg:function(r){return r.st.avg},rel:function(r){return r.rk.rel==null?-1:r.rk.rel}};
 function sortRows(rows){var f=SORT[S.sort]||SORT.last,dir=S.dir==='asc'?1:-1;
   return rows.slice().sort(function(a,b){var x=f(a),y=f(b);if(S.sort==='last'){if(!x&&y)return 1;if(x&&!y)return -1}
@@ -119,21 +120,16 @@ function riskBadge(rk){if(!rk.bad)return '';
   return '<span class="cl-bad" title="'+t+'">'+plu(rk.bad,'неявка','неявки','неявок')+'</span>'}
 function bdIcon(r){return r.bd!=null&&r.bd<=6?'<span class="cl-bd" title="День народження: '+bdText(r.c)+(r.bd===0?' (сьогодні)':' (через '+r.bd+' дн.)')+'">'+I('cake','s')+'</span>':''}
 
-function trHtml(r,full){var c=r.c,st=r.st,fav=App.staff(st.fav);
+function trHtml(r,full){var c=r.c,st=r.st,fav=App.staff(st.fav),ph=App.phoneOf(c);
   return '<tr class="click" data-id="'+c.id+'">'+(full?'<td class="cl-ck"><input type="checkbox" data-ck="'+c.id+'"'+(S.sel.has(c.id)?' checked':'')+' aria-label="Вибрати '+esc(c.n)+'"></td>':'')+
-   '<td><div class="cl-nm">'+UI.av(c)+'<div class="cl-nt"><b class="ell">'+esc(c.n)+'</b>'+bdIcon(r)+tagsLine(c)+'</div></div></td>'+
-   '<td class="num">'+(c.ph?U.phone(c.ph):'<span class="faint">—</span>')+(c.tg?' <span class="cl-tgi" title="Є Telegram">'+I('tg','s')+'</span>':'')+'</td>'+
-   '<td class="r num">'+st.visits+'</td>'+(full?'<td class="r num">'+(st.spent?money(st.spent):'—')+'</td><td class="r num">'+(st.avg?money(st.avg):'—')+'</td>':'')+
-   '<td class="nw" title="'+(st.lastDate?D.human(st.lastDate,{year:true}):'')+'">'+(st.lastDate?relDays(st.daysSince):'<span class="faint">—</span>')+'</td>'+
-   '<td class="nw">'+(st.next?nextTxt(st.next):'<span class="faint">—</span>')+'</td>'+
-   '<td class="nw">'+(fav?esc(fav.short):'<span class="faint">—</span>')+'</td>'+
-   '<td class="nw">'+(r.rk.rel==null?'<span class="faint">—</span>':'<span class="num">'+r.rk.rel+'%</span> ')+riskBadge(r.rk)+'</td></tr>'}
-function mcHtml(r,full){var c=r.c,st=r.st;
-  return '<a class="cl-mc" href="#/clients/'+c.id+'" data-id="'+c.id+'">'+(S.sm&&full?'<span class="cl-mck"><input type="checkbox" data-ck="'+c.id+'"'+(S.sel.has(c.id)?' checked':'')+' aria-label="Вибрати"></span>':'')+UI.av(c)+
-   '<span class="cl-mt"><b class="ell">'+esc(c.n)+(bdIcon(r)?' '+bdIcon(r):'')+'</b><small class="ell">'+(c.ph?U.phone(c.ph):'без телефону')+(st.lastDate?' · '+relDays(st.daysSince):'')+'</small>'+
-   ((c.tags.length||c.blocked||r.rk.bad)?'<span class="cl-mb">'+tagsLine(c)+riskBadge(r.rk)+'</span>':'')+'</span>'+
-   '<span class="cl-mr">'+(full?'<b class="num">'+(st.spent?money(st.spent):'—')+'</b>':'')+'<small>'+plu(st.visits,'візит','візити','візитів')+'</small></span></a>'}
-
+   '<td class="cl-tn"><div class="cl-nm">'+UI.av(c)+'<div class="cl-nt"><b class="ell">'+esc(c.n)+'</b>'+bdIcon(r)+tagsLine(c)+riskBadge(r.rk)+'</div></div></td>'+
+   '<td class="num cl-tp">'+(ph||'<span class="mute">'+(c.ph?'приховано':'—')+'</span>')+(c.tg&&ph?' <span class="cl-tgi" title="Є Telegram">'+I('tg','s')+'</span>':'')+'</td>'+
+   '<td class="r num cl-tv">'+st.visits+'</td>'+(full?'<td class="r num cl-ts">'+(st.spent?money(st.spent):'—')+'</td><td class="r num cl-ta">'+(st.avg?money(st.avg):'—')+'</td>':'')+
+   '<td class="nw cl-tl" title="'+(st.lastDate?D.human(st.lastDate,{year:true}):'')+'">'+(st.lastDate?relDays(st.daysSince):'<span class="mute">ще не був(ла)</span>')+'</td>'+
+   '<td class="nw cl-tx">'+(st.next?nextTxt(st.next):'<span class="mute">—</span>')+'</td>'+
+   '<td class="nw cl-tf">'+(fav?esc(fav.short):'<span class="mute">—</span>')+'</td>'+
+   '<td class="nw cl-tr">'+(r.rk.rel==null?'<span class="mute">—</span>':'<span class="num">'+r.rk.rel+'%</span>')+'</td>'+
+   '<td class="cl-tc">'+(ph?'<a class="icobtn" href="tel:+'+c.ph+'" aria-label="Подзвонити '+esc(c.n)+'">'+I('phone')+'</a>':'')+'</td></tr>'}
 function drawList(root){
   var full=isFull(),base=allRows().filter(baseOK),counts={all:base.length,lostreg:0};
   SEGS.forEach(function(s){counts[s[0]]=0});counts.all=base.length;
@@ -152,10 +148,9 @@ function drawList(root){
     UI.empty('users','Поки немає клієнтів',full?'Додайте першого клієнта або імпортуйте базу з Excel.':'Тут зʼявляться клієнти, які записувалися до вас.',full?'<button class="btn pri" data-a="new">+ Клієнт</button>':''));return}
   var shown=rows.slice(0,S.limit);
   var th=function(k,t,cls){var on=S.sort===k;return '<th'+(cls?' class="'+cls+'"':'')+(k?' data-sort="'+k+'" style="cursor:pointer"':'')+'>'+t+(on?' '+I(S.dir==='asc'?'up':'down','s'):'')+'</th>'};
-  var head='<tr>'+(full?'<th class="cl-ck"><input type="checkbox" data-a="ckall" aria-label="Вибрати всіх на сторінці"'+(shown.length&&shown.every(function(r){return S.sel.has(r.c.id)})?' checked':'')+'></th>':'')+th('name','Клієнт')+th('','Телефон')+th('visits','Візитів','r')+(full?th('spent','Витрачено','r')+th('avg','Сер. чек','r'):'')+th('last','Останній візит')+th('','Наступний')+th('','Майстер')+th('rel','Надійність')+'</tr>';
+  var head='<tr>'+(full?'<th class="cl-ck"><input type="checkbox" data-a="ckall" aria-label="Вибрати всіх на сторінці"'+(shown.length&&shown.every(function(r){return S.sel.has(r.c.id)})?' checked':'')+'></th>':'')+th('name','Клієнт')+th('','Телефон')+th('visits','Візитів','r')+(full?th('spent','Витрачено','r')+th('avg','Сер. чек','r'):'')+th('last','Останній візит')+th('','Наступний')+th('','Майстер')+th('rel','Надійність')+'<th class="cl-tc"><span class="vh">Дзвінок</span></th></tr>';
   res.innerHTML='<div class="cl-cntrow"><span class="mute">'+plu(rows.length,'клієнт','клієнти','клієнтів')+'</span><span class="sp"></span>'+(full?'<button class="btn sm ghost cl-monly" data-a="smode">'+(S.sm?'Готово':'Вибрати')+'</button>':'')+'</div>'+
-    '<div class="tbl-wrap cl-tw"><table class="tbl cl-tbl"><thead>'+head+'</thead><tbody>'+shown.map(function(r){return trHtml(r,full)}).join('')+'</tbody></table></div>'+
-    '<div class="cl-ml'+(S.sm?' sm':'')+'">'+shown.map(function(r){return mcHtml(r,full)}).join('')+'</div>'+
+    '<div class="tbl-wrap cards cl-tw'+(S.sm?' sm':'')+'"><table class="tbl cl-tbl"><thead>'+head+'</thead><tbody>'+shown.map(function(r){return trHtml(r,full)}).join('')+'</tbody></table></div>'+
     (rows.length>shown.length?'<div class="cl-more"><button class="btn" data-a="more">Показати ще '+Math.min(PAGE,rows.length-shown.length)+'</button><button class="btn ghost" data-a="all">Показати всіх ('+rows.length+')</button></div>':'');
 }
 function drawHelp(root){var full=isFull(),rs=allRows(),lr=rs.filter(function(r){return segOK(r,'lostreg')}),bd=rs.filter(function(r){return segOK(r,'bday')}),dups=full?findDups():[];
@@ -200,7 +195,8 @@ function renderList(v,params,q){
     var b=t.closest('[data-a]'),a=b&&b.dataset.a;
     if(!a){var th=t.closest('th[data-sort]');if(th){var k=th.dataset.sort;if(S.sort===k)S.dir=S.dir==='asc'?'desc':'asc';else{S.sort=k;S.dir=defDir(k)}root.querySelector('#cl-fo').value=['last','spent','visits','name'].indexOf(S.sort)>=0?S.sort:'last';redraw();return}
       var mc=t.closest('a.cl-mc');if(mc&&S.sm&&isFull()){e.preventDefault();var id=mc.dataset.id;if(S.sel.has(id))S.sel.delete(id);else S.sel.add(id);drawList(root);return}
-      var tr=t.closest('tr[data-id]');if(tr)App.openClient(tr.dataset.id);return}
+      if(t.closest('a[href^="tel:"]'))return;
+      var tr=t.closest('tr[data-id]');if(tr){if(S.sm&&isFull()&&innerWidth<900){var tid=tr.dataset.id;if(S.sel.has(tid))S.sel.delete(tid);else S.sel.add(tid);drawList(root);return}App.openClient(tr.dataset.id)}return}
     switch(a){
       case 'seg':S.seg=b.dataset.v;redraw();break;
       case 'ftoggle':S.fopen=!S.fopen;root.querySelector('#cl-filters').classList.toggle('open',S.fopen);break;
@@ -362,7 +358,7 @@ function findDups(){fresh();if(CACHE.dups)return CACHE.dups;
 var CT={vf:'all'};
 var PAYK={service:'Послуга',deposit:'Депозит',tip:'Чайові',product:'Товар',cert:'Оплата сертифікатом',abon:'З абонемента',cert_sale:'Купівля сертифіката',abon_sale:'Купівля абонемента',refund:'Повернення'};
 var PREF_SUG=['Формула фарби','Довжина та форма','Матеріали й бренди','Комфорт (напої, музика)','Інше'];
-function tabsFor(){return isFull()?[['visits','Візити'],['fin','Фінанси'],['notes','Нотатки'],['rev','Відгуки'],['consent','Згоди'],['log','Журнал']]:[['visits','Візити'],['notes','Нотатки'],['rev','Відгуки']]}
+function tabsFor(){return isFull()?[['ov','Огляд'],['visits','Візити'],['photos','Фото'],['fin','Гроші'],['notes','Нотатки'],['rev','Відгуки'],['consent','Згоди'],['log','Журнал']]:[['ov','Огляд'],['visits','Візити'],['photos','Фото'],['notes','Нотатки'],['rev','Відгуки']]}
 function svcName(id){var s=App.svc(id);return s?s.n:id}
 function methodName(m){return m==='cert'?'Сертифікат':m==='abon'?'Абонемент':App.payMethod(m).n}
 function stfName(id){var s=App.staff(id);return s?s.short:'—'}
@@ -375,20 +371,20 @@ function favSvc(st){var cnt={};st.all.forEach(function(a){if(a.status==='done')a
 function monthsSince(d){var n=D.diff(d,App.today());return n<45?n+NB+'дн.':n<700?Math.round(n/30)+NB+'міс.':(n/365).toFixed(1).replace('.',',')+NB+'р.'}
 
 function renderCard(v,id,q){
-  App.setTop('');
+  App.setTop(isFull()?'<button class="icobtn cl-monly" data-act="cl-cmenu" aria-label="Дії з клієнтом">'+I('more')+'</button>':'');
   var c=App.client(id);
   if(!c||!canSee(c)){v.innerHTML='<div class="page">'+UI.empty(c?'lock':'users',c?'Немає доступу до цього клієнта':'Клієнта не знайдено',c?'Майстер бачить лише клієнтів, які ходили до нього.':'Можливо, його видалено або обʼєднано з іншим.','<a class="btn" href="#/clients" style="margin-top:8px">До списку клієнтів</a>')+'</div>';return}
   var full=isFull(),g=stats(id),st=scoped(c),rk=g.rk,tabs=tabsFor();
-  var tab=tabs.some(function(t){return t[0]===q.tab})?q.tab:'visits';
+  var tab=tabs.some(function(t){return t[0]===q.tab})?q.tab:'ov';
   var h='<div class="page cl-cardpage" id="cl-card" data-id="'+id+'">';
   h+='<a class="btn ghost sm cl-back" href="#/clients">'+I('left')+'Клієнти</a>';
   /* шапка */
-  var ph=c.ph?U.phone(c.ph):'';
+  var ph=App.phoneOf(c),hid=c.ph&&!ph;
   h+='<div class="cl-hd">'+UI.av(c,'xl')+'<div class="cl-hm"><h2>'+esc(c.n)+(c.blocked?' <span class="badge dng plain">Чорний список</span>':'')+'</h2>'+
-    '<div class="cl-ct">'+(ph?'<span class="cl-ph num">'+ph+'</span><a class="icobtn sm" href="tel:+'+c.ph+'" aria-label="Подзвонити" title="Подзвонити">'+I('phone')+'</a>'+(c.tg?'<a class="icobtn sm" href="https://t.me/+'+c.ph+'" target="_blank" rel="noopener" aria-label="Написати в Telegram" title="Telegram">'+I('tg')+'</a>':'')+'<button class="icobtn sm" data-a="copy" aria-label="Скопіювати номер" title="Скопіювати номер">'+I('copy')+'</button>':'<span class="mute">Телефон не вказано</span>')+
+    '<div class="cl-ct">'+(ph?'<span class="cl-ph num">'+ph+'</span><button class="icobtn sm" data-a="copy" aria-label="Скопіювати номер" title="Скопіювати номер">'+I('copy')+'</button>':'<span class="mute">'+(hid?'Телефон приховано власником':'Телефон не вказано')+'</span>')+
     (c.bd?'<span class="cl-bdt">'+I('cake','s')+bdText(c)+(bdNext(c)!=null&&bdNext(c)<=14?' · '+(bdNext(c)===0?'сьогодні':'через '+bdNext(c)+' дн.'):'')+'</span>':'')+'</div>'+
     '<div class="cl-tr">'+c.tags.map(function(t){var o=tagObj(t);return o?'<span class="tag'+(t==='vip'?' cl-vip':'')+'">'+esc(o.n)+'</span>':''}).join('')+(full?'<button class="btn sm ghost cl-tgb" data-a="tags">'+I('tag')+(c.tags.length?'Мітки':'Додати мітку')+'</button>':'')+'</div></div>'+
-    '<div class="cl-ha"><button class="btn pri" data-a="book">'+I('plus')+'Записати</button>'+(full?'<button class="icobtn" data-a="menu" aria-label="Дії">'+I('more')+'</button>':'')+'</div></div>';
+    '<div class="cl-ha"><button class="btn pri" data-a="book">'+I('plus')+'Записати</button>'+(ph?'<a class="btn cl-callb" href="tel:+'+c.ph+'" aria-label="Подзвонити">'+I('phone')+'<span>Подзвонити</span></a>'+'<a class="icobtn" href="tg://resolve?phone='+c.ph+'" aria-label="Написати в Telegram" title="Telegram">'+I('tg')+'</a>'+'<a class="icobtn" href="viber://chat?number=%2B'+c.ph+'" aria-label="Написати у Viber" title="Viber">'+I('msg')+'</a>':'')+(full?'<button class="icobtn cl-hmenu" data-a="menu" aria-label="Дії">'+I('more')+'</button>':'')+'</div></div>';
   /* попередження */
   var al='';
   if(c.blocked)al+='<div class="note dng">'+I('ban')+'<div><b>У чорному списку</b>'+(c.blockedAt?' з '+D.human(c.blockedAt):'')+(c.blockReason?'. Причина: '+esc(c.blockReason):'')+'</div></div>';
@@ -409,7 +405,7 @@ function renderCard(v,id,q){
   var root=$('#cl-card',v);
   wireCard(root,c,tabs);
 }
-function tabsHtml(c,tabs,tab){var cnt={visits:stats(c.id).all.length,rev:clientReviews(c.id).length,notes:(c.prefs||[]).length};
+function tabsHtml(c,tabs,tab){var cnt={photos:photosOf(c.id).length,visits:stats(c.id).all.length,rev:clientReviews(c.id).length,notes:(c.prefs||[]).length};
   return tabs.map(function(t){return '<button role="tab" data-a="tab" data-v="'+t[0]+'" aria-selected="'+(t[0]===tab)+'">'+t[1]+(cnt[t[0]]?' <span class="cnt">'+(t[0]==='visits'?scopedCount(c):cnt[t[0]])+'</span>':'')+'</button>'}).join('')}
 function scopedCount(c){return scoped(c).all.length}
 
@@ -442,7 +438,61 @@ function asideHtml(c,g,st,full){var rk=g.rk,h='',nx=st.next;
     '<dt>Є Telegram</dt><dd>'+(can?UI.sw('tg',c.tg,'data-f="tg" aria-label="Є Telegram"'):(c.tg?'так':'ні'))+'</dd></dl></div>';
   return h}
 
-function tabBody(tab,c,g,st){return ({visits:tabVisits,fin:tabFin,notes:tabNotes,rev:tabRev,consent:tabConsent,log:tabLog}[tab]||tabVisits)(c,g,st)}
+/* ─ B3: Огляд ─ */
+function tabOv(c,g,st){var full=isFull(),T=App.today(),debt=full?App.clientDebt(c.id)||0:0;
+  var dep=U.sum(g.all.filter(function(a){return a.deposit>0&&a.date>=T&&['cancelled','done','noshow'].indexOf(a.status)<0}),function(a){return a.deposit});
+  var h='<div class="cl-ov">';
+  var fm=(c.prefs||[]).filter(function(p){return /формул|алерг|протипок/i.test((p.title||'')+' '+(p.text||''))}).slice(0,2);
+  if(fm.length)h+='<div class="note warn cl-ovw">'+I('note')+'<div>'+fm.map(function(p){return '<b>'+esc(p.title||'Формула')+':</b> '+esc((p.text||'').slice(0,180))}).join('<br>')+'</div></div>';
+  if(full){var dueA=debt?g.all.filter(function(a){return a.status==='done'&&a.date<=T&&App.apptDue(a)>0}).sort(function(a,b){return a.date<b.date?1:-1})[0]:null;
+    h+='<div class="card cl-ovm"><h3>Гроші</h3><div class="cl-ovk">'+
+      '<div><span>Борг</span><b class="num'+(debt?' dng-t':'')+'">'+(debt?money(debt):'немає')+'</b></div>'+
+      '<div><span>Депозит</span><b class="num">'+(dep?money(dep):'—')+'</b></div>'+
+      '<div><span>Витрачено</span><b class="num">'+money(st.spent||0)+'</b></div></div>'+
+      (dueA?'<button class="btn blk" data-a="openappt" data-id="'+dueA.id+'">'+I('wallet')+'Прийняти борг · '+D.shortH(dueA.date)+'</button>':'')+'</div>'}
+  var done=st.all.filter(function(a){return a.status==='done'}).sort(function(a,b){return a.date<b.date?1:-1}).slice(0,3);
+  h+='<div class="card flush"><div class="card-h"><b>Останні візити</b><span class="sp"></span><button class="btn sm ghost" data-a="tab" data-v="visits">Усі</button></div>'+
+    (done.length?'<div class="list">'+done.map(function(a){return '<button class="li" data-a="openappt" data-id="'+a.id+'"><div class="t"><b class="ell">'+esc(App.apptTitle(a))+'</b><small>'+D.human(a.date,{year:true})+' · '+esc(stfName(a.staff))+'</small></div>'+(full?'<span class="r num">'+money(App.apptTotal(a))+'</span>':'')+'</button>'}).join('')+'</div>':
+      UI.empty('cal','Візитів ще не було','Після першого візиту тут буде коротка історія.'))+'</div>';
+  var pr=(c.prefs||[]).slice(0,2);
+  h+='<div class="card"><h3>Нотатки<span class="sp"></span><button class="btn sm ghost" data-a="tab" data-v="notes">Усі</button></h3>'+
+    (pr.length?pr.map(function(p){return '<p class="cl-ovn"><b>'+esc(p.title||'Нотатка')+'.</b> '+esc((p.text||'').slice(0,160))+'</p>'}).join(''):(c.note?'<p class="cl-ovn">'+esc(c.note)+'</p>':'<p class="mute cl-ovn">Формула, побажання, що не подобається — запишіть, щоб не питати двічі.</p>'))+'</div>';
+  var ps=photosOf(c.id).slice(0,4);
+  h+='<div class="card"><h3>Фото<span class="sp"></span><button class="btn sm ghost" data-a="tab" data-v="photos">'+(ps.length?'Усі':'Додати')+'</button></h3>'+
+    (ps.length?'<div class="photos cl-ovp">'+ps.map(phTile).join('')+'</div>':'<p class="mute cl-ovn">Фото «до» і «після» допоможуть повторити результат.</p>')+'</div>';
+  h+='<div class="cl-ovaside">'+asideHtml(c,g,st,full)+'</div>';
+  return h+'</div>'}
+
+/* ─ B3: Фото ─ */
+function photosOf(cid){return (App.db.photos||[]).filter(function(p){return p.client===cid}).sort(function(a,b){return a.date<b.date?1:a.date>b.date?-1:(a.kind==='before'?-1:1)})}
+var KIND={before:'До',after:'Після'};
+function phTile(p){return '<button class="ph" data-a="phopen" data-id="'+p.id+'" aria-label="Фото '+(KIND[p.kind]||'')+' · '+D.human(p.date)+'">'+(p.src?'<img src="'+p.src+'" alt="" loading="lazy">':I('layers'))+'<small>'+(KIND[p.kind]||'Фото')+'</small></button>'}
+function tabPhotos(c,g,st){var ps=photosOf(c.id),full=isFull();
+  var add='<div class="cl-phadd"><button class="btn pri" data-a="phadd" data-k="before">'+I('upload')+'Фото «до»</button><button class="btn" data-a="phadd" data-k="after">'+I('upload')+'Фото «після»</button>'+
+    '<input type="file" accept="image/*" capture="environment" id="cl-phin" hidden></div>';
+  if(!ps.length)return add+UI.empty('layers','Фото ще немає','Знімайте до і після — так легше показати результат і повторити роботу.');
+  var grp=U.groupBy(ps,function(p){return p.appt||('d'+p.date)});
+  var keys=Object.keys(grp).sort(function(a,b){return grp[a][0].date<grp[b][0].date?1:-1});
+  return add+'<div class="cl-phg">'+keys.map(function(k){var arr=grp[k],a=arr[0].appt&&App.db.appts.find(function(x){return x.id===arr[0].appt});
+    return '<section class="cl-phs"><div class="cl-phh"><b>'+D.human(arr[0].date,{year:true})+'</b>'+(a?'<span class="mute ell">'+esc(App.apptTitle(a))+'</span>':'')+'<span class="sp"></span><span class="mute">'+arr.length+'</span></div><div class="photos">'+arr.map(phTile).join('')+'</div></section>'}).join('')+'</div>'+
+    '<p class="cl-hint">До 30 фото на клієнта. Фото зберігаються в цьому браузері (демо).</p>'}
+function shrinkImg(file,cb){var fr=new FileReader();fr.onload=function(){var im=new Image();im.onload=function(){var k=Math.min(1,800/Math.max(im.width,im.height)),cv=document.createElement('canvas');cv.width=Math.round(im.width*k);cv.height=Math.round(im.height*k);cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);cb(cv.toDataURL('image/jpeg',.7))};im.onerror=function(){cb(null)};im.src=fr.result};fr.onerror=function(){cb(null)};fr.readAsDataURL(file)}
+function photoViewer(c,id,onChange){var ps=photosOf(c.id),i=Math.max(0,ps.findIndex(function(p){return p.id===id}));
+  var el=document.createElement('div');el.className='cl-pv';el.setAttribute('role','dialog');el.setAttribute('aria-modal','true');el.setAttribute('aria-label','Перегляд фото');document.body.appendChild(el);
+  function draw(){if(!ps.length){close();return}i=(i+ps.length)%ps.length;var p=ps[i];
+    el.innerHTML='<div class="cl-pvt"><span><b>'+(KIND[p.kind]||'Фото')+'</b> · '+D.human(p.date,{year:true})+'</span><span class="sp"></span><span class="num">'+(i+1)+' / '+ps.length+'</span>'+
+      '<button class="icobtn" data-v="del" aria-label="Видалити фото">'+I('trash')+'</button><button class="icobtn" data-v="x" aria-label="Закрити">'+I('x')+'</button></div>'+
+      '<div class="cl-pvi">'+(p.src?'<img src="'+p.src+'" alt="">':'<div class="cl-pve">'+I('layers')+'<span>Демо-фото без зображення</span></div>')+'</div>'+
+      (ps.length>1?'<button class="icobtn cl-pvp" data-v="p" aria-label="Попереднє">'+I('left')+'</button><button class="icobtn cl-pvn" data-v="n" aria-label="Наступне">'+I('right')+'</button>':'')}
+  function close(){document.removeEventListener('keydown',key);el.remove()}
+  function key(e){if(e.key==='Escape')close();else if(e.key==='ArrowLeft'){i--;draw()}else if(e.key==='ArrowRight'){i++;draw()}}
+  el.onclick=function(e){var b=e.target.closest('[data-v]'),v=b&&b.dataset.v;if(!v){if(e.target===el)close();return}
+    if(v==='x')close();else if(v==='p'){i--;draw()}else if(v==='n'){i++;draw()}
+    else if(v==='del'){var p=ps[i];UI.confirm({title:'Видалити фото?',text:'Фото «'+(KIND[p.kind]||'')+'» від '+D.human(p.date)+' буде видалено з картки. Повернути не вийде.',ok:'Видалити',danger:true}).then(function(ok){if(!ok)return;O.delPhoto(p.id);ps.splice(i,1);UI.toast('Фото видалено');onChange();draw()})}};
+  var x0=null;el.addEventListener('touchstart',function(e){x0=e.touches[0].clientX},{passive:true});
+  el.addEventListener('touchend',function(e){if(x0==null)return;var dx=e.changedTouches[0].clientX-x0;x0=null;if(Math.abs(dx)>40){i+=dx<0?1:-1;draw()}});
+  document.addEventListener('keydown',key);draw()}
+function tabBody(tab,c,g,st){return ({ov:tabOv,photos:tabPhotos,visits:tabVisits,fin:tabFin,notes:tabNotes,rev:tabRev,consent:tabConsent,log:tabLog}[tab]||tabVisits)(c,g,st)}
 
 function tabVisits(c,g,st){var full=isFull(),T=App.today();
   var all=st.all.slice().sort(function(a,b){return (a.date+String(a.start).padStart(4,'0'))<(b.date+String(b.start).padStart(4,'0'))?1:-1});
@@ -510,13 +560,15 @@ function tabLog(c,g){var es=logEntries(c,g).slice(0,80);
 /* ───── обробники картки ───── */
 function wireCard(root,c,tabs){
   var id=c.id;
-  function setTab(t){var g=stats(id),st=scoped(c);history.replaceState(null,'','#/clients/'+id+(t!=='visits'?'?tab='+t:''));
+  function setTab(t){var g=stats(id),st=scoped(c);history.replaceState(null,'','#/clients/'+id+(t!=='ov'?'?tab='+t:''));
     root.querySelector('#cl-tabs').innerHTML=tabsHtml(c,tabs,t);root.querySelector('#cl-tab').innerHTML=tabBody(t,c,g,st)}
-  function curTab(){var b=root.querySelector('#cl-tabs [aria-selected=true]');return b?b.dataset.v:'visits'}
+  function curTab(){var b=root.querySelector('#cl-tabs [aria-selected=true]');return b?b.dataset.v:'ov'}
   function save(patch,msg){O.upsertClient(Object.assign({id:id},patch));if(msg!==false)UI.toast(msg||'Збережено')}
   root.addEventListener('click',function(e){var b=e.target.closest('[data-a]');if(!b)return;var a=b.dataset.a;
     switch(a){
       case 'tab':setTab(b.dataset.v);break;
+      case 'phopen':photoViewer(c,b.dataset.id,function(){setTab(curTab())});break;
+      case 'phadd':var pin=root.querySelector('#cl-phin');if(pin){pin.dataset.k=b.dataset.k;pin.value='';pin.click()}break;
       case 'vf':CT.vf=b.dataset.v;setTab(curTab());break;
       case 'copy':copyText('+'+c.ph,'Номер скопійовано');break;
       case 'book':App.newAppt({client:id});break;
@@ -532,7 +584,12 @@ function wireCard(root,c,tabs){
       case 'export':exportClientData(c);break;
       case 'del':deleteFlow(c);break}
   });
-  root.addEventListener('change',function(e){var t=e.target,f=t.dataset.f;if(!f)return;
+  root.addEventListener('change',function(e){var t=e.target;
+    if(t.id==='cl-phin'){var fl=t.files&&t.files[0];if(!fl)return;shrinkImg(fl,function(src){if(!src){UI.toast('Не вдалося прочитати фото',{type:'err'});return}
+      var last=scoped(c).all.filter(function(a){return a.status==='done'||a.date===App.today()}).sort(function(a,b){return a.date<b.date?1:-1})[0];
+      var ph=O.addPhoto({client:id,kind:t.dataset.k||'after',src:src,appt:last&&last.date===App.today()?last.id:null});
+      if(!ph){UI.toast('Ліміт 30 фото на клієнта',{type:'err'});return}UI.toast('Фото додано');setTab(curTab())});return}
+    var f=t.dataset.f;if(!f)return;
     if(f==='note'){if(t.value!==(c.note||''))save({note:t.value.trim()})}
     else if(f==='allergy'){if(t.value.trim()!==(c.allergy||'')){save({allergy:t.value.trim()});App.refresh()}}
     else if(f==='src'){save({src:t.value})}
@@ -568,7 +625,7 @@ function blockFlow(c){UI.confirm({title:'Додати до чорного спи
   if(!y)return;O.blockClient(c.id,typeof y==='string'?y.trim():'');UI.toast('Додано до чорного списку',{undo:function(){O.unblockClient(c.id);App.refresh()}});App.refresh()})}
 
 function deleteFlow(c){var g=stats(c.id),n=g.all.length;
-  UI.confirm({title:'Видалити клієнта?',text:'<b>'+esc(c.n)+'</b> зникне зі списку. '+(n?plu(n,'запис','записи','записів')+' залишаться в календарі та касі як «без імені» — виручка й звіти не зміняться.':'Записів у клієнта немає.')+' Відгуки лишаться без привʼязки до клієнта.',ok:'Видалити',danger:true}).then(function(y){
+  UI.confirm({title:'Видалити клієнта?',text:'<b>'+esc(c.n)+'</b> зникне зі списку. '+(n?plu(n,'запис','записи','записів')+' залишаться в календарі та касі як «без імені» — виторг і звіти не зміняться.':'Записів у клієнта немає.')+' Відгуки лишаться без привʼязки до клієнта.',ok:'Видалити',danger:true}).then(function(y){
     if(!y)return;
     var snap={c:JSON.parse(JSON.stringify(c)),appts:g.all.map(function(a){return a.id}),reviews:App.db.reviews.filter(function(r){return r.client===c.id}).map(function(r){return r.id}),pays:App.db.payments.filter(function(p){return p.client===c.id}).map(function(p){return p.id}),wl:App.db.waitlist.filter(function(w){return w.client===c.id}).map(function(w){return JSON.parse(JSON.stringify(w))})};
     O.deleteClient(c.id);

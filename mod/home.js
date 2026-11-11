@@ -117,7 +117,7 @@ function tasksPage(v,params,q){
   var html='<div class="page narrow hm-page">'+
    '<div class="hm-addbar"><div class="inp-ic" style="flex:1">'+ic('plus')+'<input class="inp" id="hm-quick" placeholder="Нова задача… (Enter — додати на сьогодні)" autocomplete="off"></div>'+
    (manager?'<div class="seg"><button data-hm="tf" data-f="mine" aria-pressed="'+(f==='mine')+'">Мої</button><button data-hm="tf" data-f="all" aria-pressed="'+(f==='all')+'">Усі</button></div>':'')+'</div>'+
-   (over.length+today.length+later.length===0?UI.empty('task','Все виконано','Додайте першу задачу — наприклад, замовити матеріали чи передзвонити клієнту.','<button class="btn pri" data-hm="tnew" style="margin-top:8px">Нова задача</button>'):
+   (over.length+today.length+later.length===0?UI.empty('task','Задач немає','Додайте першу — Enter, щоб зберегти.','<button class="btn pri" data-hm="tnew" style="margin-top:8px">Нова задача</button>'):
      sec('Прострочені',over,'dng-t')+sec('Сьогодні',today)+sec('Пізніше',later))+
    (done.length?'<section class="hm-sec"><h3>Виконані <span class="pill-n">'+done.length+'</span>'+(done.length>5?'<button class="btn ghost sm" data-hm="tdoneall" style="margin-left:auto">'+(showDone?'Згорнути':'Показати всі')+'</button>':'')+'</h3><div class="hm-tasks">'+doneShown.map(function(t){return taskRow(t,{noWho:f==='mine'})}).join('')+'</div></section>':'')+
   '</div>';
@@ -159,56 +159,52 @@ function hmClick(e,ctx){
     if(k==='newappt')return App.newAppt({});
     if(k==='note'){return noteEdit()}
     if(k==='call'){return}
+    if(k==='closeday')return App.closeDayWizard();
+    if(k==='attmore'){var cd=b.closest('[data-attn]');if(cd)cd.classList.add('open');b.remove();return}
+    if(k==='mday')return App.setQ({d:b.dataset.d===T()?'':b.dataset.d},true);
+    if(k==='slot')return App.newAppt({staff:App.db.meId,date:b.dataset.d,start:+b.dataset.s});
     return}
   var r=e.target.closest('[data-open]');if(r&&!e.target.closest('a,button'))App.openAppt(r.dataset.open);
 }
 App.actions['hm-new']=function(){App.newAppt({})};
 App.actions['hm-tnew']=function(){taskForm()};
 
-/* ───────── ДАШБОРД: компоненти ───────── */
-function kpi(l,v,d,cls){return '<div class="kpi"><div class="l">'+l+'</div><div class="v">'+v+'</div>'+(d?'<div class="d '+(cls||'')+'">'+d+'</div>':'')+'</div>'}
+/* ───────── ДАШБОРД v2: компоненти (DESIGN-V2 §7.2) ───────── */
+var METH={cash:'Готівка',card:'Картка',transfer:'Переказ',online:'Онлайн',cert:'Сертифікат',abon:'Абонемент'};
+function kpi(l,v,d,cls){return '<div class="kpi"><div class="l">'+l+'</div><div class="v num">'+v+'</div>'+(d?'<div class="d '+(cls||'')+'">'+d+'</div>':'')+'</div>'}
+function risks(a){return App.apptRisks(a).map(function(r){return '<span class="tag hm-risk r-'+r.k+'">'+esc(r.t)+'</span>'}).join('')}
+function mainBtn(a,o){var st=a.status;o=o||{};
+  if(st==='new')return '<button class="btn sm" data-hm="confirm" data-id="'+a.id+'">Підтвердити</button>';
+  if(st==='confirmed')return '<button class="btn sm" data-hm="arrive" data-id="'+a.id+'">Прийшов</button>';
+  if(st==='arrived'&&App.can('checkout')&&o.pay!==false)return '<button class="btn sm pri" data-hm="pay" data-id="'+a.id+'">Оплата</button>';
+  return ''}
 function apRow(a,o){
-  o=o||{};var c=App.client(a.client),st=a.status,end=App.apptEnd(a),late=o.late;
-  var act='';
-  if(o.act!==false){
-    if(st==='new')act='<button class="btn sm" data-hm="confirm" data-id="'+a.id+'">Підтвердити</button>';
-    else if(st==='confirmed')act='<button class="btn sm" data-hm="arrive" data-id="'+a.id+'">Прийшов</button>';
-    else if(st==='arrived'&&App.can('checkout'))act='<button class="btn sm pri" data-hm="pay" data-id="'+a.id+'">Оплата</button>';
-    if(st==='confirmed'&&App.can('checkout')&&a.date===T()&&false)act+='';
-  }
-  var tags='';
-  if(c&&c.tags.indexOf('allergy')>=0)tags+=' <span class="tag hm-tag-a">алергія</span>';
-  if(c&&c.tags.indexOf('vip')>=0)tags+=' <span class="tag">VIP</span>';
-  var due=App.apptDue(a);
-  return '<div class="li click hm-ap st-'+st+'" data-open="'+a.id+'" tabindex="0">'+
-    '<div class="hm-time"><b>'+U.hm(a.start)+'</b><small>'+U.hm(end)+'</small></div>'+
-    '<div class="t"><b class="ell">'+esc(cname(a))+tags+'</b><small class="ell">'+esc(App.apptTitle(a))+' · '+esc(stf(a))+'</small></div>'+
-    (st==='new'&&!o.hideBadge?'<span class="badge new d-only">Нова</span>':'')+
-    (late?'<span class="badge dng">+'+late+NB+'хв</span>':'')+
+  o=o||{};var st=a.status,end=App.apptEnd(a),now=D.nowMin(),T0=T();
+  var late=a.date===T0&&(st==='new'||st==='confirmed')&&a.start+10<=now?now-a.start:0;
+  var nowCls=st==='arrived'||(a.date===T0&&a.start<=now&&end>now&&st!=='done'&&st!=='noshow')?' now':'';
+  var act=o.act===false?'':mainBtn(a,o);
+  var sub=esc(App.apptTitle(a))+(o.noStaff?'':' · '+esc(stf(a)));
+  return '<div class="li click hm-ap st-'+st+nowCls+((st==='done'||st==='noshow')?' dim':'')+'" data-open="'+a.id+'" tabindex="0">'+
+    '<div class="hm-time num"><b>'+U.hm(a.start)+'</b><small>'+U.hm(end)+'</small></div>'+
+    '<div class="t"><b class="ell">'+esc(cname(a))+'</b><small class="ell">'+sub+'</small>'+(o.risk!==false?'<span class="hm-risks">'+risks(a)+'</span>':'')+'</div>'+
+    (late?'<span class="badge dng nw">+'+late+NB+'хв</span>':st==='done'?'<span class="badge done d-only">оплачено</span>':st==='noshow'?'<span class="badge noshow d-only">не прийшов</span>':'')+
     (act?'<div class="hm-acts">'+act+'</div>':'')+
   '</div>'}
-function nowList(){
-  var T0=T(),now=D.nowMin();
-  var as=App.apptsOn(T0).filter(function(a){return a.status==='arrived'});
-  var h='<div class="card flush"><div class="card-h"><b>Зараз у салоні</b><span class="pill-n">'+as.length+'</span></div>';
-  if(!as.length){
-    var nx=App.apptsOn(T0).filter(function(a){return (a.status==='confirmed'||a.status==='new')&&a.start>=now}).shift();
-    h+='<div class="hm-none">Зараз нікого.'+(nx?' Найближчий клієнт — о '+U.hm(nx.start)+' ('+esc(cname(nx))+').':' На сьогодні більше немає записів.')+'</div>'}
-  else h+=as.map(function(a){
-    var since=a.arrivedAt?(function(){var m=U.pm(a.arrivedAt.slice(11,16));return Math.max(0,now-m)})():null;
-    var c=App.client(a.client);
-    return '<div class="li click hm-ap st-arrived" data-open="'+a.id+'" tabindex="0"><div class="hm-time"><b>'+U.hm(a.start)+'</b><small>'+U.hm(App.apptEnd(a))+'</small></div>'+
-     '<div class="t"><b class="ell">'+esc(cname(a))+(c&&c.tags.indexOf('allergy')>=0?' <span class="tag hm-tag-a">алергія</span>':'')+'</b><small class="ell">'+esc(App.apptTitle(a))+' · '+esc(stf(a))+(since!=null?' · у салоні '+U.dur(since):'')+'</small></div>'+
-     '<div class="hm-acts">'+(App.can('checkout')?'<button class="btn sm pri" data-hm="pay" data-id="'+a.id+'">Оплата</button>':'')+'</div></div>'}).join('');
-  return h+'</div>'}
-function upcoming(){
+/* «Зараз і далі» — стрічка дня */
+function feedCard(){
   var T0=T(),now=D.nowMin(),Tm=D.add(T0,1);
-  var as=App.db.appts.filter(function(a){return (a.status==='new'||a.status==='confirmed')&&((a.date===T0&&a.start>=now-60)||a.date>T0)}).sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:a.start-b.start}).slice(0,6);
-  var h='<div class="card flush"><div class="card-h"><b>Найближчі записи</b><span class="sp"></span><a class="link" href="#/calendar">Календар</a></div>';
-  if(!as.length)return h+'<div class="hm-none">Найближчих записів немає. <a class="link" data-act="hm-new">Створити запис</a></div></div>';
-  var last=null;
-  h+=as.map(function(a){var sep='';if(a.date!==last){last=a.date;if(a.date!==T0)sep='<div class="hm-sep">'+(a.date===Tm?'Завтра':D.human(a.date,{wd:true}))+'</div>'}
-    var late=a.date===T0&&a.start<now-10?now-a.start:0;return sep+apRow(a,{late:late})}).join('');
+  var day=App.apptsOn(T0).filter(function(a){return a.status!=='cancelled'&&!a.block});
+  var cur=day.filter(function(a){return a.status==='arrived'});
+  var next=day.filter(function(a){return (a.status==='new'||a.status==='confirmed')&&App.apptEnd(a)>now-60});
+  var done=day.filter(function(a){return a.status==='done'||a.status==='noshow'});
+  var list=cur.concat(next);
+  var h='<div class="card flush hm-feed"><div class="card-h"><b>Зараз і далі</b>'+(list.length?'<span class="pill-n">'+list.length+'</span>':'')+'<span class="sp"></span>'+(hasRoute('calendar')?'<a class="link" href="#/calendar">Календар</a>':'')+'</div>';
+  if(!list.length){var tm=App.apptsOn(Tm).filter(function(a){return a.status!=='cancelled'&&!a.block});
+    h+='<div class="hm-empty">'+ic('cal','l')+'<b>'+(day.length?'На сьогодні все — більше записів немає':'Сьогодні записів немає')+'</b><span>'+(tm.length?'Завтра '+plan(tm.length,'запис','записи','записів')+', перший о '+U.hm(tm[0].start)+'.':'Завтра поки порожньо.')+'</span>'+(App.canNew(null)?'<button class="btn" data-hm="newappt">'+ic('plus')+'Новий запис</button>':'')+'</div>';
+    if(tm.length)h+='<div class="hm-sep">Завтра</div>'+tm.slice(0,4).map(function(a){return apRow(a)}).join('')}
+  else{var LIM=8;h+=list.slice(0,LIM).map(function(a){return apRow(a)}).join('');
+    if(list.length>LIM)h+=hasRoute('calendar')?'<a class="hm-more" href="#/calendar?v=list">Ще '+(list.length-LIM)+' — у календарі</a>':'<div class="hm-none">Ще '+(list.length-LIM)+'</div>'}
+  if(done.length)h+='<details class="hm-done"><summary>Завершені сьогодні · '+done.length+'</summary>'+done.map(function(a){return apRow(a,{act:false,risk:false})}).join('')+'</details>';
   return h+'</div>'}
 function attention(){
   var db=App.db,T0=T(),now=D.nowMin(),items=[];
@@ -220,21 +216,21 @@ function attention(){
   /* запізнюються */
   db.appts.filter(function(a){return a.date===T0&&(a.status==='new'||a.status==='confirmed')&&a.start+10<=now&&a.start>now-240}).slice(0,3).forEach(function(a){
     var c=App.client(a.client);
-    add('dng','clock',esc(cname(a))+' запізнюється на '+U.dur(now-a.start),'Запис на '+U.hm(a.start)+' · '+esc(stf(a))+(c&&c.ph?' · '+U.phone(c.ph):''),
+    add('dng','clock',esc(cname(a))+' запізнюється на '+U.dur(now-a.start),'Запис на '+U.hm(a.start)+' · '+esc(stf(a))+(App.phoneOf(c)?' · '+App.phoneOf(c):''),
       btn('Прийшов','arrive','data-id="'+a.id+'"')+btn('Не прийшов','noshow','data-id="'+a.id+'"','ghost'))});
   /* непідтверджені */
   var nw=db.appts.filter(function(a){return a.status==='new'&&a.date>=T0&&a.date<=D.add(T0,2)&&!(a.date===T0&&a.start+10<=now)}).sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:a.start-b.start});
   if(nw.length)add('warn','msg',plan(nw.length,'непідтверджений запис','непідтверджені записи','непідтверджених записів')+' на 3 дні',nw.slice(0,3).map(function(a){return esc(U.short(cname(a)))+' '+(a.date===T0?'':D.shortH(a.date)+' ')+U.hm(a.start)}).join(', ')+(nw.length>3?'…':''),btn('Підтвердити всі','confirmall','data-ids="'+nw.map(function(a){return a.id}).join(',')+'"','pri'));
   /* день не закрито вчора */
   var y=D.add(T0,-1);
-  if(db.settings.accounting.dayClose&&!db.dayClose[y]&&db.payments.some(function(p){return p.date===y})&&App.can('cash.view'))add('warn','safe','Вчорашній день не закрито','Звірте готівку в касі та закрийте день',btn('Закрити день','go','data-to="cash"'));
+  if(db.settings.accounting.dayClose&&!db.dayClose[y]&&db.payments.some(function(p){return p.date===y})&&App.can('cash.view'))add('warn','safe','Вчорашній день не закрито','Звірте готівку в касі та закрийте день',btn('Закрити день','closeday','','pri'));
   /* задачі */
   var tcount=openCount();
   if(mod('tasks')&&tcount)add(App.db.tasks.some(function(t){return !t.done&&t.due&&t.due<T0})?'dng':'plain','task',plan(tcount,'задача','задачі','задач')+' на сьогодні або прострочені','Відкрийте список, щоб виконати',btn('До задач','go','data-to="tasks"'));
   /* лист очікування */
   if(mod('waitlist'))(db.waitlist||[]).forEach(function(w){var sv=App.svc(w.svc);if(!sv||items.filter(function(i){return i.wait}).length>=2)return;
     for(var d=(w.from<T0?T0:w.from);d<=w.to;d=D.add(d,1)){var sl=App.freeSlots(w.staff,d,sv.d).filter(function(s){return d!==T0||s>now+30});if(sl.length){var c=App.client(w.client);
-      items.push({wait:1,tone:'ok',ic:'clock',title:'Є вільний час для '+esc(c?c.n:'клієнта'),sub:esc(sv.n)+' · '+esc((App.staff(w.staff)||{}).short||'')+' · '+D.human(d)+' о '+U.hm(sl[0])+(w.note?' · '+esc(w.note):''),
+      items.push({wait:1,tone:'ok',ic:'clock',title:'Вільне вікно: '+esc(c?c.n:'клієнт з листа очікування'),sub:esc(sv.n)+' · '+esc((App.staff(w.staff)||{}).short||'')+' · '+D.human(d)+' о '+U.hm(sl[0])+(w.note?' · '+esc(w.note):''),
         btns:btn('Записати','wait','data-w=\''+JSON.stringify({staff:w.staff,date:d,start:sl[0],client:w.client})+'\'','pri')+btn('Прибрати','waitdel','data-id="'+w.id+'"','ghost')});break}}});
   /* день народження */
   db.clients.filter(function(c){return c.bd&&c.bd.slice(5)===T0.slice(5)}).slice(0,3).forEach(function(c){
@@ -248,9 +244,22 @@ function attention(){
   return items}
 function attnCard(){
   var it=attention();
-  var h='<div class="card flush hm-attn"><div class="card-h"><b>Потребує уваги</b>'+(it.length?'<span class="pill-n">'+it.length+'</span>':'')+'</div>';
+  var h='<div class="card flush hm-attn" data-attn><div class="card-h"><b>Потребує уваги</b>'+(it.length?'<span class="pill-n">'+it.length+'</span>':'')+'</div>';
   if(!it.length)return h+'<div class="hm-none hm-ok">'+ic('check')+' Усе під контролем — нічого термінового.</div></div>';
-  return h+it.slice(0,9).map(function(i){return '<div class="hm-att t-'+i.tone+'"><span class="hm-att-i">'+ic(i.ic)+'</span><div class="t"><b>'+i.title+'</b><small>'+i.sub+'</small></div>'+(i.btns?'<div class="hm-acts">'+i.btns+'</div>':'')+'</div>'}).join('')+'</div>'}
+  return h+it.slice(0,8).map(function(i,n){return '<div class="hm-att t-'+i.tone+(n>=3?' hm-x':'')+'"><span class="hm-att-i">'+ic(i.ic)+'</span><div class="t"><b>'+i.title+'</b><small>'+i.sub+'</small></div>'+(i.btns?'<div class="hm-acts">'+i.btns+'</div>':'')+'</div>'}).join('')+
+   (it.length>3?'<button class="hm-more m-only" data-hm="attmore">Ще '+(Math.min(it.length,8)-3)+'</button>':'')+'</div>'}
+/* «Каса дня» */
+function cashCard(){
+  if(!App.can('cash.view'))return '';
+  var T0=T(),ds=App.dayStatus(T0),bm=ds.byMethod||{},keys=Object.keys(bm).filter(function(k){return bm[k]});
+  var dc=App.db.dayClose[T0];
+  var h='<div class="card hm-cash"><h3>Каса дня<span class="sp"></span>'+(hasRoute('cash')?'<a class="link" href="#/cash">Каса</a>':'')+'</h3>'+
+    '<div class="hm-cash-top"><span class="hm-big num">'+U.uah(ds.revenue)+'</span><span class="mute">виторг · '+plan(ds.done,'візит','візити','візитів')+'</span></div>';
+  h+=keys.length?'<div class="hm-meth">'+keys.map(function(k){return '<div><span>'+esc(METH[k]||k)+'</span><b class="num">'+U.uah(bm[k])+'</b></div>'}).join('')+'<div class="hm-meth-t"><span>Готівка в касі зараз</span><b class="num">'+U.uah(ds.expected)+'</b></div></div>':
+    '<p class="mute hm-cash-e">Оплат сьогодні ще не було. Готівка в касі: <b class="num">'+U.uah(ds.expected)+'</b></p>';
+  if(dc)h+='<div class="note'+(dc.diff?' warn':'')+'">'+ic(dc.diff?'alert':'check')+'<span>День закрито'+(dc.diff?' · розбіжність '+U.uah(dc.diff):' без розбіжностей')+'</span></div>';
+  else if(App.can('cash.close')||App.can('cash.*'))h+='<button class="btn blk" data-hm="closeday">'+ic('safe')+'Закрити день</button>';
+  return h+'</div>'}
 function weekCard(){
   var T0=T(),ws=D.weekStart(T0),pw=D.add(ws,-7),days=D.range(ws,D.add(ws,6));
   var cur=days.map(function(d){return d>T0?0:dayRevenue(d)}),prv=days.map(function(d){return dayRevenue(D.add(d,-7))});
@@ -279,94 +288,127 @@ function tasksCard(){
   if(!ts.length)return h+'<div class="hm-none">На сьогодні задач немає.</div></div>';
   return h+'<div class="hm-tasks in">'+ts.map(function(t){return taskRow(t,{compact:true})}).join('')+'</div></div>'}
 
-/* ───────── ДАШБОРД: власник / адмін ───────── */
+/* ───────── ДАШБОРД: власник / адмін (DESIGN-V2 §7.2) ───────── */
+function hrs(min){var h=Math.round(min/30)/2;return String(h).replace('.',',')+NB+'год'}
 function dashStaff(v){
-  var T0=T(),me=App.me(),now=D.nowMin();
-  var all=App.apptsOn(T0).filter(function(a){return a.status!=='cancelled'});
-  var done=all.filter(function(a){return a.status==='done'}).length;
-  var m=App.money(T0,T0),left=expectedLeft(T0);
-  var cap=capacity(T0),bk=booked(T0),load=cap?Math.round(bk/cap*100):0;
+  var T0=T(),me=App.me();
+  var all=App.apptsOn(T0).filter(function(a){return a.status!=='cancelled'&&!a.block});
+  var came=all.filter(function(a){return a.status==='arrived'||a.status==='done'}).length;
+  var ds=App.dayStatus(T0),unpaid=U.sum(ds.unpaid.map(App.appt).filter(Boolean),function(a){return App.apptDue(a)});
+  var cap=capacity(T0),bk=booked(T0),free=Math.max(0,cap-bk),load=cap?Math.round(bk/cap*100):0;
   var y=D.add(T0,-1),ym=App.money(y,y).revenue;
-  App.setTop('<button class="btn pri" data-act="hm-new">'+ic('plus')+'<span class="d-only">Новий запис</span></button>');
-  v.innerHTML='<div class="page hm-page">'+
+  App.setTop('');
+  v.innerHTML='<div class="page hm-page hm-owner">'+
    '<div class="page-h"><div><h2>'+greet()+', '+esc(voc(me.n))+'</h2><p>'+D.human(T0,{wd:true})+' · '+esc(App.db.salon.name)+'</p></div></div>'+
    '<div class="kpis hm-kpis">'+
-     kpi('Записів сьогодні',all.length,done+' з '+all.length+' завершено')+
-     kpi('Виторг на цей час',U.uah(m.revenue),ym?'вчора за день '+U.uah(ym):'')+
-     kpi('Очікується до кінця дня',U.uah(left),left?'за записами, що лишились':'всі оплати прийнято')+
-     kpi('Завантаженість',load+'%','майстрів: '+App.masters().filter(function(s){return App.workHours(s.id,T0)}).length+' на зміні')+
+     kpi('Виторг сьогодні',U.uah(ds.revenue),ym?'вчора '+U.uah(ym):'')+
+     kpi('Записів',came+NB+'/'+NB+all.length,'прийшли / всього')+
+     kpi('Вільно',hrs(free),cap?'завантаженість '+load+'%':'ніхто не працює')+
+     kpi('Неоплачено',U.uah(unpaid),ds.unpaid.length?plan(ds.unpaid.length,'візит','візити','візитів')+' чекають оплати':'усе оплачено',ds.unpaid.length?'down':'')+
    '</div>'+
-   '<div class="hm-grid"><div class="hm-col hm-l">'+nowList()+upcoming()+weekCard()+'</div>'+
-   '<div class="hm-col hm-r">'+attnCard()+tasksCard()+noteCard()+'</div></div></div>';
+   '<div class="hm-grid2">'+
+     '<div class="hm-a">'+attnCard()+'</div>'+
+     '<div class="hm-m">'+feedCard()+weekCard()+'</div>'+
+     '<div class="hm-s">'+cashCard()+tasksCard()+noteCard()+'</div>'+
+   '</div></div>';
   v.onclick=function(e){hmClick(e)};
 }
 
-/* ───────── ДАШБОРД: майстер «Мій день» ───────── */
-function dashMaster(v){
-  var T0=T(),me=App.me(),now=D.nowMin();
-  var as=App.apptsOn(T0,me.id).filter(function(a){return a.status!=='cancelled'});
-  var pr=App.payroll(me.id,T0,T0),pp=App.payPeriod(),per=App.payroll(me.id,pp.from,pp.to);
-  var rest=as.filter(function(a){return a.status==='new'||a.status==='confirmed'||a.status==='arrived'});
-  var est=Math.round(U.sum(rest,function(a){return App.apptTotal(a)})*(pr.pct||0)/100);
-  var next=as.filter(function(a){return a.status==='arrived'}).shift()||as.filter(function(a){return (a.status==='new'||a.status==='confirmed')&&a.start>=now-30}).shift();
-  var wh=App.workHours(me.id,T0),off=App.timeOff(me.id,T0);
-  function nextCard(){
-    if(!next)return '<div class="card"><h3>Наступний клієнт</h3><p class="mute" style="margin:0">'+(as.length?'На сьогодні клієнтів більше немає — гарна робота.':'Записів на сьогодні немає.')+'</p></div>';
-    var c=App.client(next.client),st=c?App.clientStats(c.id):null;
-    var h='<div class="card hm-next"><h3>'+(next.status==='arrived'?'Зараз у вас':'Наступний клієнт')+'<span class="sp"></span><span class="hm-nt">'+U.hm(next.start)+'–'+U.hm(App.apptEnd(next))+'</span></h3>'+
-     '<div class="row g12">'+UI.av(c,'lg')+'<div style="min-width:0"><div class="hm-nm">'+esc(cname(next))+'</div><div class="mute">'+esc(App.apptTitle(next))+'</div></div></div>';
-    var notes=[];
-    if(c&&c.tags.indexOf('allergy')>=0)notes.push('<div class="note dng">'+ic('alert')+'<span><b>Алергія.</b> '+esc(c.note||'Уточніть матеріали перед початком.')+'</span></div>');
-    else if(c&&c.note)notes.push('<div class="note">'+ic('note')+'<span>'+esc(c.note)+'</span></div>');
-    if(next.note)notes.push('<div class="note">'+ic('msg')+'<span>'+esc(next.note)+'</span></div>');
-    if(c&&c.tags.indexOf('late')>=0)notes.push('<div class="note warn">'+ic('clock')+'<span>Часто запізнюється</span></div>');
-    h+=(notes.length?'<div class="col-f" style="margin-top:12px">'+notes.join('')+'</div>':'');
-    if(st)h+='<div class="hm-mini"><span><b>'+st.visits+'</b> візитів</span><span>середній чек <b>'+U.uah(st.avg)+'</b></span><span>останній '+(st.lastDate?D.rel(st.lastDate):'—')+'</span></div>';
-    h+='<div class="row" style="margin-top:14px">'+(next.status==='new'||next.status==='confirmed'?'<button class="btn pri" data-hm="arrive" data-id="'+next.id+'">Клієнт прийшов</button>':'')+'<button class="btn" data-hm="open" data-id="'+next.id+'">Відкрити запис</button></div></div>';
+/* ───────── ДАШБОРД: майстер «Мій день» (DESIGN-V2 §6.6) ───────── */
+function gaps(staffId,date,as){var wh=App.workHours(staffId,date);if(!wh)return [];
+  var busy=as.filter(function(a){return a.status!=='cancelled'&&a.status!=='noshow'}).map(function(a){return [a.start,App.apptEnd(a)]});
+  if(wh.brk)busy.push([wh.brk[0],wh.brk[1]]);busy.sort(function(a,b){return a[0]-b[0]});
+  var out=[],t=wh.start,now=date===T()?D.nowMin():-1;
+  busy.forEach(function(b){if(b[0]-t>=30)out.push([t,b[0]]);t=Math.max(t,b[1])});
+  if(wh.end-t>=30)out.push([t,wh.end]);
+  return out.map(function(g){return [Math.max(g[0],now>g[0]&&now<g[1]?Math.ceil(now/15)*15:g[0]),g[1]]}).filter(function(g){return g[1]-g[0]>=30&&g[1]>now})}
+function dashMaster(v,q){
+  var T0=T(),me=App.me(),day=(q&&q.d)||T0,now=D.nowMin(),acc=App.db.settings.access||{};
+  var canPay=App.can('checkout')||acc.masterPay;
+  var as=App.apptsOn(day,me.id).filter(function(a){return a.status!=='cancelled'&&!a.block}).sort(function(a,b){return a.start-b.start});
+  var pr=App.payroll(me.id,day,day);
+  var wh=App.workHours(me.id,day),off=App.timeOff&&App.timeOff(me.id,day);
+  var gp=gaps(me.id,day,App.apptsOn(day,me.id));
+  var freeMin=U.sum(gp,function(g){return g[1]-g[0]});
+  var cur=day===T0?(as.filter(function(a){return a.status==='arrived'})[0]||as.filter(function(a){return (a.status==='new'||a.status==='confirmed')&&App.apptEnd(a)>now})[0]):null;
+  var ttl=U.$('#ttl');if(ttl)ttl.textContent='Мій день';
+  App.setTop('');
+  function curCard(){
+    if(!cur)return '';
+    var c=App.client(cur.client),st=c?App.clientStats(c.id):null,ph=App.phoneOf(c);
+    var h='<div class="card hm-cur'+(cur.status==='arrived'?' on':'')+'"><div class="hm-cur-h"><span class="hm-cur-l">'+(cur.status==='arrived'?'Зараз у вас':'Наступний клієнт')+'</span><span class="sp"></span><b class="num">'+U.hm(cur.start)+'–'+U.hm(App.apptEnd(cur))+'</b></div>'+
+     '<div class="hm-cur-c">'+UI.av(c,'lg')+'<div class="t"><div class="hm-nm ell">'+esc(cname(cur))+'</div><div class="mute ell">'+esc(App.apptTitle(cur))+'</div></div></div>';
+    var notes=[];var al=c&&(c.allergy||(c.tags.indexOf('allergy')>=0?(c.note||'Уточніть матеріали перед початком'):''));
+    if(al)notes.push('<div class="note dng">'+ic('alert')+'<span><b>Алергія.</b> '+esc(al)+'</span></div>');
+    if(c&&c.formula)notes.push('<div class="note">'+ic('note')+'<span><b>Формула.</b> '+esc(c.formula)+'</span></div>');
+    else if(c&&c.note&&!al)notes.push('<div class="note">'+ic('note')+'<span>'+esc(c.note)+'</span></div>');
+    if(cur.note)notes.push('<div class="note">'+ic('msg')+'<span>'+esc(cur.note)+'</span></div>');
+    if(notes.length)h+='<div class="col-f hm-cur-n">'+notes.join('')+'</div>';
+    if(st&&!st.visits)h+='<div class="hm-mini"><span><b>Новий клієнт</b> — перший візит</span></div>';
+    else if(st)h+='<div class="hm-mini"><span><b>'+st.visits+'</b> '+U.plural(st.visits,'візит','візити','візитів')+'</span><span>середній чек <b class="num">'+U.uah(st.avg)+'</b></span><span>останній '+(st.lastDate?D.rel(st.lastDate):'—')+'</span></div>';
+    var b='';
+    if(cur.status==='new'||cur.status==='confirmed')b='<button class="btn pri" data-hm="arrive" data-id="'+cur.id+'">Клієнт прийшов</button>';
+    else if(cur.status==='arrived'&&canPay)b='<button class="btn pri" data-hm="pay" data-id="'+cur.id+'">Оплата</button>';
+    h+='<div class="hm-cur-b">'+b+(ph?'<a class="btn" href="tel:'+esc(c.ph)+'">'+ic('phone')+'Подзвонити</a>':'')+'<button class="btn" data-hm="open" data-id="'+cur.id+'">Відкрити</button></div></div>';
     return h}
   function line(){
-    if(!as.length)return '<div class="card flush"><div class="card-h"><b>Мій день</b></div>'+'<div class="hm-none">'+(off?'У вас вихідний: '+esc(off.note||'відпустка'):(wh?'Записів ще немає.':'Сьогодні вихідний.'))+'</div></div>';
-    return '<div class="card flush"><div class="card-h"><b>Мій день</b><span class="pill-n">'+as.length+'</span><span class="sp"></span>'+(wh?'<span class="mute">зміна '+U.hm(wh.start)+'–'+U.hm(wh.end)+'</span>':'')+'</div>'+
-     as.map(function(a){var cur=a.status==='arrived',dn=a.status==='done'||a.status==='noshow';
-       return '<div class="li click hm-ap st-'+a.status+(dn?' dim':'')+'" data-open="'+a.id+'" tabindex="0"><div class="hm-time"><b>'+U.hm(a.start)+'</b><small>'+U.hm(App.apptEnd(a))+'</small></div>'+
-        '<div class="t"><b class="ell">'+esc(cname(a))+'</b><small class="ell">'+esc(App.apptTitle(a))+'</small></div>'+
-        (cur?'<span class="badge arrived">у вас</span>':a.status==='done'?'<span class="badge done">готово</span>':a.status==='noshow'?'<span class="badge noshow">не прийшов</span>':a.status==='new'?'<span class="badge new">нова</span>':'')+'</div>'}).join('')+'</div>'}
-  App.setTop('');
-  v.innerHTML='<div class="page hm-page">'+
-   '<div class="page-h"><div><h2>'+greet()+', '+esc(voc(me.n))+'</h2><p>'+D.human(T0,{wd:true})+' · мій день</p></div></div>'+
-   '<div class="kpis hm-kpis">'+kpi('Записів сьогодні',as.length,as.filter(function(a){return a.status==='done'}).length+' завершено')+
-    kpi('Зароблено сьогодні',U.uah(pr.total),pr.tips?'з них чайові '+U.uah(pr.tips):'ставка '+pr.pct+'%')+
-    kpi('Ще очікується',U.uah(est),rest.length?plan(rest.length,'запис','записи','записів')+' попереду':'на сьогодні все')+
-    kpi('За поточний період',U.uah(per.total),D.shortH(pp.from)+' – '+D.shortH(pp.to)+(per.left>0?' · до виплати '+U.uah(per.left):''))+'</div>'+
-   '<div class="hm-grid"><div class="hm-col hm-l">'+nextCard()+line()+'</div><div class="hm-col hm-r">'+tasksCard()+noteCard()+'</div></div></div>';
+    var rows=[];as.forEach(function(a){if(cur&&a.id===cur.id)return;rows.push({t:a.start,h:apRow(a,{noStaff:true,pay:canPay})})});
+    gp.forEach(function(g){rows.push({t:g[0],h:'<button class="li hm-gap" data-hm="slot" data-d="'+day+'" data-s="'+g[0]+'"><div class="hm-time num"><b>'+U.hm(g[0])+'</b><small>'+U.hm(g[1])+'</small></div><div class="t"><b>вільно '+U.dur(g[1]-g[0])+'</b></div><span class="hm-gap-a">'+ic('plus','s')+'записати</span></button>'})});
+    rows.sort(function(a,b){return a.t-b.t});
+    var h='<div class="card flush"><div class="card-h"><b>'+(day===T0?'Сьогодні':'Записи')+'</b>'+(as.length?'<span class="pill-n">'+as.length+'</span>':'')+'<span class="sp"></span>'+(wh?'<span class="mute">зміна '+U.hm(wh.start)+'–'+U.hm(wh.end)+'</span>':'')+'</div>';
+    if(!rows.length)return h+'<div class="hm-empty">'+ic('cal','l')+'<b>'+(off?'Вихідний: '+esc(off.note||'відпустка'):wh?'Записів немає':'Цей день не робочий')+'</b><span>'+(wh?'Увесь день вільний.':'Графік змінює адміністратор.')+'</span></div></div>';
+    return h+rows.map(function(r){return r.h}).join('')+'</div>'}
+  var rel=D.diff(T0,day);
+  var dayLbl=(rel===0?'Сьогодні':rel===1?'Завтра':rel===-1?'Вчора':'')+(rel>=-1&&rel<=1?', ':'')+D.human(day,{wd:true});
+  v.innerHTML='<div class="page narrow hm-page hm-myday">'+
+   '<div class="hm-dnav"><button class="icobtn" data-hm="mday" data-d="'+D.add(day,-1)+'" aria-label="Попередній день">'+ic('left')+'</button><div class="hm-dnav-t"><b>'+(rel===0?'Сьогодні':rel===1?'Завтра':rel===-1?'Вчора':D.human(day,{wd:true}).split(',')[0])+'</b><span>'+D.human(day,{wd:true})+'</span></div><button class="icobtn" data-hm="mday" data-d="'+D.add(day,1)+'" aria-label="Наступний день">'+ic('right')+'</button></div>'+
+   (day!==T0?'<button class="btn ghost sm hm-today" data-hm="mday" data-d="'+T0+'">До сьогодні</button>':'')+
+   '<div class="kpis hm-kpis hm-k2">'+kpi('Записів / вільно',as.length+NB+'/'+NB+hrs(freeMin),wh?'зміна '+U.hm(wh.start)+'–'+U.hm(wh.end):'не робочий день')+
+    kpi('Зароблено',U.uah(pr.total),pr.tips?'з них чайові '+U.uah(pr.tips):'ставка '+(pr.pct||0)+'%')+'</div>'+
+   curCard()+line()+(day===T0?tasksCard():'')+'</div>';
   v.onclick=function(e){hmClick(e)};
+  var pg=v.querySelector('.hm-myday'),x0=null,y0=0;
+  pg.addEventListener('touchstart',function(e){var t=e.touches[0];x0=t.clientX;y0=t.clientY},{passive:true});
+  pg.addEventListener('touchend',function(e){if(x0==null)return;var t=e.changedTouches[0],dx=t.clientX-x0,dy=t.clientY-y0;x0=null;
+    if(Math.abs(dx)>window.innerWidth*0.3&&Math.abs(dx)>Math.abs(dy)*1.5)App.setQ({d:D.add(day,dx<0?1:-1)},true)});
 }
 
 /* ───────── ДАШБОРД: бухгалтер ───────── */
+function openDays(){var T0=T(),out=[];for(var i=1;i<=14;i++){var d=D.add(T0,-i);if(App.db.dayClose[d])continue;
+  var pays=App.db.payments.filter(function(p){return p.date===d});if(!pays.length)continue;
+  out.push({d:d,rev:App.money(d,d).revenue,n:pays.length})}return out}
 function dashAcc(v){
-  var T0=T(),me=App.me(),ws=D.weekStart(T0),ms=D.monthStart(T0),pp=App.payPeriod();
-  var d=App.money(T0,T0),w=App.money(ws,T0),m=App.money(ms,T0);
+  var T0=T(),me=App.me(),ms=D.monthStart(T0),pp=App.payPeriod();
+  var m=App.money(ms,T0);
   var pays=App.masters().map(function(s){return {s:s,p:App.payroll(s.id,pp.from,pp.to)}});
   var owe=U.sum(pays,function(x){return Math.max(0,x.p.left)});
+  var dcs=Object.keys(App.db.dayClose).filter(function(d){return d>=ms&&d<=T0}).map(function(d){return App.db.dayClose[d]});
+  var diffs=dcs.filter(function(r){return r.diff});var diffSum=U.sum(diffs,function(r){return r.diff});
+  var od=openDays();
   var exp=App.db.expenses.slice().sort(function(a,b){return a.date<b.date?1:-1}).slice(0,6);
-  var y=D.add(T0,-1),dc=App.db.dayClose[y];
   var cat=function(id){var c=App.db.expCats.find(function(x){return x.id===id});return c?c.n:id};
   App.setTop('');
-  v.innerHTML='<div class="page hm-page"><div class="page-h"><div><h2>'+greet()+', '+esc(voc(me.n))+'</h2><p>'+D.human(T0,{wd:true})+' · фінансовий огляд</p></div></div>'+
-   '<div class="kpis hm-kpis">'+kpi('Виторг сьогодні',U.uah(d.revenue),plan(d.visits,'візит','візити','візитів'))+kpi('Виторг тижня',U.uah(w.revenue),'з понеділка')+kpi('Виторг місяця',U.uah(m.revenue),'витрати '+U.uah(m.expenses))+kpi('Готівка в касі',U.uah(App.cashBalance(T0)),dc?(dc.diff?'вчора розбіжність '+U.uah(dc.diff):'вчора день закрито'):'вчора не закрито',dc&&dc.diff?'down':'')+'</div>'+
-   '<div class="hm-grid"><div class="hm-col hm-l">'+
-    '<div class="card flush"><div class="card-h"><b>До виплати майстрам</b><span class="sp"></span><span class="mute">'+D.shortH(pp.from)+' – '+D.shortH(pp.to)+'</span></div>'+
-    pays.map(function(x){return '<div class="li">'+UI.av(x.s,'sm')+'<div class="t"><b>'+esc(x.s.short)+'</b><small>нараховано '+U.uah(x.p.total)+' · виплачено '+U.uah(x.p.paid)+'</small></div><b class="num nw">'+U.uah(Math.max(0,x.p.left))+'</b></div>'}).join('')+
-    '<div class="li hm-tot"><div class="t"><b>Разом до виплати</b></div><b class="num nw">'+U.uah(owe)+'</b></div></div></div>'+
-   '<div class="hm-col hm-r"><div class="card flush"><div class="card-h"><b>Останні витрати</b><span class="sp"></span>'+(hasRoute('expenses')?'<a class="link" href="#/expenses">Усі</a>':'')+'</div>'+
-    exp.map(function(e){return '<div class="li"><div class="t"><b class="ell">'+esc(e.note||cat(e.cat))+'</b><small>'+D.shortH(e.date)+' · '+esc(cat(e.cat))+'</small></div><b class="num nw">'+U.uah(e.amount)+'</b></div>'}).join('')+'</div>'+
-    (hasRoute('reports')?'<a class="btn blk" href="#/reports">Відкрити звіти</a>':'')+'</div></div></div>';
+  v.innerHTML='<div class="page hm-page"><div class="page-h"><div><h2>'+greet()+', '+esc(voc(me.n))+'</h2><p>'+D.human(T0,{wd:true})+' · фінанси з '+D.shortH(ms)+'</p></div></div>'+
+   '<div class="kpis hm-kpis">'+kpi('Виторг',U.uah(m.revenue),plan(m.visits,'візит','візити','візитів')+' за місяць')+
+    kpi('Витрати',U.uah(m.expenses),m.revenue?Math.round(m.expenses/m.revenue*100)+'% від виторгу':'')+
+    kpi('До виплати майстрам',U.uah(owe),D.shortH(pp.from)+' – '+D.shortH(pp.to))+
+    kpi('Розбіжності каси',diffs.length?U.uah(diffSum):'0'+NB+'₴',diffs.length?plan(diffs.length,'день','дні','днів')+' з розбіжністю':'усе зійшлося',diffs.length?'down':'')+'</div>'+
+   '<div class="hm-grid2 hm-acc">'+
+    '<div class="hm-a"><div class="card flush"><div class="card-h"><b>Не закриті дні</b>'+(od.length?'<span class="pill-n">'+od.length+'</span>':'')+'<span class="sp"></span>'+(hasRoute('cash')?'<a class="link" href="#/cash">Каса</a>':'')+'</div>'+
+      (od.length?od.map(function(o){return '<button class="li click" data-hm="go" data-to="cash" data-q=\''+JSON.stringify({d:o.d})+'\'><div class="t"><b>'+D.human(o.d,{wd:true})+'</b><small>'+plan(o.n,'оплата','оплати','оплат')+' · каса не звірена</small></div><b class="num nw">'+U.uah(o.rev)+'</b>'+ic('right','s')+'</button>'}).join(''):'<div class="hm-none hm-ok">'+ic('check')+' Усі дні за 2 тижні закриті.</div>')+'</div></div>'+
+    '<div class="hm-m"><div class="card flush"><div class="card-h"><b>До виплати майстрам</b><span class="sp"></span>'+(hasRoute('payroll')?'<a class="link" href="#/payroll">Зарплати</a>':'')+'</div>'+
+     pays.map(function(x){return '<div class="li">'+UI.av(x.s,'sm')+'<div class="t"><b>'+esc(x.s.short)+'</b><small>нараховано '+U.uah(x.p.total)+' · виплачено '+U.uah(x.p.paid)+'</small></div><b class="num nw">'+U.uah(Math.max(0,x.p.left))+'</b></div>'}).join('')+
+     '<div class="li hm-tot"><div class="t"><b>Разом</b></div><b class="num nw">'+U.uah(owe)+'</b></div></div></div>'+
+    '<div class="hm-s"><div class="card flush"><div class="card-h"><b>Останні витрати</b><span class="sp"></span>'+(hasRoute('expenses')?'<a class="link" href="#/expenses">Усі</a>':'')+'</div>'+
+     (exp.length?exp.map(function(e){return '<div class="li"><div class="t"><b class="ell">'+esc(e.note||cat(e.cat))+'</b><small>'+D.shortH(e.date)+' · '+esc(cat(e.cat))+'</small></div><b class="num nw">'+U.uah(e.amount)+'</b></div>'}).join(''):'<div class="hm-none">Витрат ще немає.</div>')+'</div>'+
+     (hasRoute('reports')?'<a class="btn blk" href="#/reports">Відкрити звіти</a>':'')+'</div>'+
+   '</div></div>';
   v.onclick=function(e){hmClick(e)};
 }
 
-App.route('home',{title:'Сьогодні',icon:'home',nav:true,group:'work',order:1,render:function(v){
+App.route('home',{title:'Сьогодні',icon:'home',nav:true,group:'work',order:1,render:function(v,params,q){
   var role=App.me().role;
-  if(role==='master')return dashMaster(v);
+  if(role==='master')return dashMaster(v,q||{});
   if(role==='accountant')return dashAcc(v);
   dashStaff(v)}});
 
