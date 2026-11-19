@@ -8,8 +8,13 @@
 var U=App.u, D=App.d, UI=App.ui, $=U.$, $$=U.$$, esc=U.esc, I=App.icon, NB='\u00A0';
 var ZOOMS=[.8,1,1.2,1.5,1.9,2.4];
 var LS_Z='slotly-cal-zoom';
+/* телефон: один коефіцієнт масштабу (години + ширина колонок), 50…200 %, крок 25 % — як у Комільфо */
+var MZ_MIN=.5,MZ_MAX=2,MZ_STEP=.25,LS_MZ='slotly-cal-zoom-m';
+function clampMz(z){return Math.min(MZ_MAX,Math.max(MZ_MIN,z))}
+function snapMz(z){return clampMz(Math.round(z/MZ_STEP)*MZ_STEP)}
 var S=App.cal={v:'day',d:App.today(),m:'',mobM:'',r:'day',st:'',src:'',unpaid:false,qq:'',showCancelled:false,view:null,sel:{},lim:120,scr:null,
-  zoom:(function(){var z=+localStorage.getItem(LS_Z);return ZOOMS.indexOf(z)>=0?z:1.2})()};
+  zoom:(function(){var z=+localStorage.getItem(LS_Z);return ZOOMS.indexOf(z)>=0?z:1.2})(),
+  mz:(function(){var z=+localStorage.getItem(LS_MZ);return z>0?clampMz(z):1})()};
 var MOVABLE={new:1,confirmed:1,arrived:1};
 var OFFKIND={vacation:'Відпустка',sick:'Лікарняний',personal:'Відсутня',training:'Навчання'};
 var BLOCK_LABELS=['Перерва','Обід','Особиста справа','Навчання','Закупівля','Інше'];
@@ -273,7 +278,7 @@ App.route('calendar',{title:'Календар',icon:'cal',nav:true,group:'work',
     var m2=isMob()&&S.v==='day';
     view.innerHTML='<div class="cal cal-v-'+S.v+(m2?' cal-m2':'')+(S.move?' is-move':'')+'">'+(m2?wkHtml():isMob()?mobBarHtml()+mobChips():'')+(S.move?moveBarHtml():'')+
       (S.v==='day'?dayHtml():S.v==='week'?weekHtml():listHtml())+
-      '</div>';
+      (m2?mzHtml():'')+'</div>';
     afterRender(view);
     if(m2){monTitle();setTimeout(function(){if(App.cur&&App.cur.rt.id==='calendar'&&isMob()&&S.v==='day')monTitle()},0)}
   }
@@ -285,7 +290,12 @@ App.on('change',function(){
 });
 
 /* ───────── сітка (спільна для «День» і «Тиждень → майстер») ───────── */
-function ppmNow(){return isMob()?1.55:S.zoom}
+function ppmNow(){return isMob()?(S.v==='day'?Math.round(155*S.mz)/100:1.55):S.zoom}
+function mzHtml(){
+  return '<div class="cal-mzm" role="group" aria-label="Масштаб"><button data-act="cal-mzoom" data-z="-1" aria-label="Зменшити масштаб"'+(S.mz<=MZ_MIN?' disabled':'')+'>'+I('minus','s')+'</button>'+
+    '<button class="pc" data-act="cal-mzoom" data-z="0" title="Скинути масштаб">'+Math.round(S.mz*100)+'%</button>'+
+    '<button data-act="cal-mzoom" data-z="1" aria-label="Збільшити масштаб"'+(S.mz>=MZ_MAX?' disabled':'')+'>'+I('plus','s')+'</button></div>';
+}
 /* колонка: {key,staff,date,head,wh,off} */
 function colRange(cols){
   var lo=1e9,hi=-1;
@@ -395,8 +405,8 @@ function gridHtml(cols,o){
       list.map(function(x){return apptBlockHtml(x,lo,ppm,fv,ln[x.id])}).join('')+a+'</div>';
   });
   var m2=isMob()&&S.v==='day',gut=window.innerWidth<360?36:40;
-  var minW=o.minCol||(isMob()?(S.v==='day'&&S.mobM==='*'&&cols.length>1?Math.max(100,Math.floor((window.innerWidth-gut)/3.25)):0):160);
-  return '<div class="cal-wrap'+(m2?(cols.length>1?' cal-multi':' cal-one')+(!canAll()?' cal-solo':''):'')+'" data-lo="'+lo+'" data-hi="'+hi+'" data-ppm="'+ppm+'" data-step="'+step+'" style="--ppm:'+ppm+';--step:'+(step*ppm)+'px;--n:'+cols.length+';--cw:'+minW+'px">'+
+  var minW=o.minCol||(isMob()?(S.v==='day'&&S.mobM==='*'&&cols.length>1?Math.round(Math.max(100,Math.floor((window.innerWidth-gut)/3.25))*S.mz):0):160);
+  return '<div class="cal-wrap'+(m2?(cols.length>1?' cal-multi':' cal-one')+(!canAll()?' cal-solo':'')+(cols.length>1&&minW<80?' cal-zs':''):'')+'" data-lo="'+lo+'" data-hi="'+hi+'" data-ppm="'+ppm+'" data-step="'+step+'" style="--ppm:'+ppm+';--step:'+(step*ppm)+'px;--n:'+cols.length+';--cw:'+minW+'px">'+
     '<div class="cal-gridin">'+head+'<div class="cal-bd" style="height:'+H+'px">'+axis+body+'</div></div></div>';
 }
 function masterHead(m,date){
@@ -624,7 +634,9 @@ function listHtml(){
 function afterRender(view){
   var wrap=$('.cal-wrap',view);
   if(wrap){
-    if(S.keep&&S.scr){wrap.scrollTop=S.scr.t;wrap.scrollLeft=S.scr.l}
+    if(S._za){var A=S._za,gi=$('.cal-hd',wrap),hh=gi?gi.offsetHeight:0,gu=$('.cal-axh',wrap),gw=gu?gu.offsetWidth:0;
+      wrap.scrollTop=Math.max(0,(A.y-hh)*A.ry+hh-A.my);wrap.scrollLeft=Math.max(0,(A.x-gw)*A.rx+gw-A.mx);S._za=null}
+    else if(S.keep&&S.scr){wrap.scrollTop=S.scr.t;wrap.scrollLeft=S.scr.l}
     else{
       var lo=+wrap.dataset.lo,ppm=+wrap.dataset.ppm,T=App.today(),target=null;
       if($('.cal-col.is-today',wrap)&&D.nowMin()>=lo)target=(D.nowMin()-lo)*ppm-140;
@@ -661,6 +673,14 @@ act('zoom',function(el){
   var i=ZOOMS.indexOf(S.zoom)+(+el.dataset.z);i=Math.max(0,Math.min(ZOOMS.length-1,i));
   S.zoom=ZOOMS[i];localStorage.setItem(LS_Z,S.zoom);S.keep=true;App.refresh();
 });
+/* телефон: масштаб — кнопки округлюють до кроку, потім ±25 %; середня — скинути на 100 % */
+function setMz(z,mx,my){
+  z=clampMz(Math.round(z*100)/100);var w=$('.cal-wrap');
+  if(w){var r=w.getBoundingClientRect(),x=mx==null?r.width/2:mx-r.left,y=my==null?r.height/2:my-r.top,multi=w.classList.contains('cal-multi');
+    S._za={x:w.scrollLeft+x,y:w.scrollTop+y,mx:x,my:y,ry:z/S.mz,rx:multi?z/S.mz:1}}
+  S.mz=z;localStorage.setItem(LS_MZ,String(z));S.keep=true;App.refresh();
+}
+act('mzoom',function(el){var d=+el.dataset.z;setMz(d?snapMz(S.mz)+d*MZ_STEP:1)});
 act('new',function(){App.newAppt({staff:S.m||undefined,date:S.d})});
 act('day',function(el){var p={v:'day',d:el.dataset.d};if(el.dataset.m)p.m=el.dataset.m;go(p)});
 act('mweek',function(el){go({v:'week',m:el.dataset.m})});
@@ -895,6 +915,7 @@ function dragEnd(){
   var sx=0,sy=0,t0=0,on=false,lock=0,el=null;
   document.addEventListener('touchstart',function(e){
     on=false;lock=0;
+    if(e.touches.length>1){if(el){el.style.transform='';el.style.opacity=''}return} /* два пальці — це щипок */
     if(!isMob()||!App.cur||App.cur.rt.id!=='calendar'||S.v==='list')return;
     if(e.target.closest('.cal-chips,.cal-mbar,.cal-movebar,input,select'))return;
     el=e.target.closest('.cal-wrap,.cal-wkl,.cal-wks');if(!el)return;
@@ -914,6 +935,36 @@ function dragEnd(){
   },{passive:true});
 })();
 
+
+/* ───────── щипок двома пальцями (телефон, «День»): плавний масштаб 50…200 % ───────── */
+(function(){
+  var P=null;
+  function dist(t){return Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY)}
+  function lbl(z){var b=$('.cal-mzm .pc');if(b)b.textContent=Math.round(z*100)+'%'}
+  document.addEventListener('touchstart',function(e){
+    if(e.touches.length!==2||!isMob()||!App.cur||App.cur.rt.id!=='calendar'||S.v!=='day'||S.drag)return;
+    var w=e.target.closest&&e.target.closest('.cal-m2 .cal-wrap');if(!w)return;
+    var gi=$('.cal-gridin',w),r=w.getBoundingClientRect(),t=e.touches;
+    var mx=(t[0].clientX+t[1].clientX)/2,my=(t[0].clientY+t[1].clientY)/2;
+    P={w:w,gi:gi,d0:dist(t),base:S.mz,z:S.mz,mx:mx,my:my,ox:w.scrollLeft+mx-r.left,oy:w.scrollTop+my-r.top,multi:w.classList.contains('cal-multi')};
+    if(gi){gi.style.transformOrigin=P.ox+'px '+P.oy+'px';gi.style.willChange='transform'}
+  },{passive:true});
+  document.addEventListener('touchmove',function(e){
+    if(!P)return;
+    if(e.touches.length<2)return;
+    e.preventDefault();
+    P.z=clampMz(P.base*dist(e.touches)/P.d0);var k=P.z/P.base;
+    if(P.gi)P.gi.style.transform='scale('+(P.multi?k:1)+','+k+')';
+    lbl(P.z);
+  },{passive:false});
+  function end(e){
+    if(!P||(e.touches&&e.touches.length>=2))return;
+    var p=P;P=null;if(p.gi){p.gi.style.transform='';p.gi.style.willChange=''}
+    S.lpAt=Date.now();
+    if(Math.abs(p.z-p.base)>.005)setMz(p.z,p.mx,p.my);else lbl(p.base);
+  }
+  document.addEventListener('touchend',end,{passive:true});document.addEventListener('touchcancel',end,{passive:true});
+})();
 
 /* ═════════ B2: перенос (режим вибору слота), «Повідомити клієнта?», сигнал листа очікування ═════════ */
 App._b2move=true;App._b2wait=true;
@@ -994,6 +1045,7 @@ function waitCountFor(staff,date){
 (function(){
   var tm=null,sx=0,sy=0;
   document.addEventListener('touchstart',function(e){
+    if(e.touches.length>1){clearTimeout(tm);tm=null;return}
     if(!isMob()||!App.cur||App.cur.rt.id!=='calendar'||S.v!=='day')return;
     var t=e.target;if(t.closest('.cal-chips,.cal-mbar,button:not(.cal-ap),input,select,a'))return;
     var ap=t.closest('.cal-ap'),col=t.closest('.cal-col');if(!ap&&!col)return;

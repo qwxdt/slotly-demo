@@ -625,6 +625,31 @@ button.cal-wc:hover{border-color:var(--ink);}
   .cal-msum b{color:var(--ink);font-weight:600}
   .cal-msum .bar{flex:1;height:4px;border-radius:2px;background:#E9E9EC;overflow:hidden;min-width:24px}
   .cal-msum .bar i{display:block;height:100%;background:var(--accent);border-radius:2px}
+  /* масштаб (телефон): плашка «− 100% +» знизу зліва, щипок лише на сітці */
+  .cal-m2 .cal-wrap{touch-action:pan-x pan-y}
+  .cal-m2 .cal-multi .cal-gridin{width:max(100%,calc(var(--gut) + var(--n)*var(--cw)))}
+  .cal-m2 .cal-multi .cal-hd,.cal-m2 .cal-multi .cal-bd{grid-template-columns:var(--gut) repeat(var(--n),minmax(var(--cw),1fr))}
+  .cal-mzm{position:fixed;left:12px;bottom:calc(var(--tab) + 12px + env(safe-area-inset-bottom));z-index:25;display:flex;align-items:stretch;height:38px;background:#fff;border:1px solid var(--line-strong);border-radius:10px;box-shadow:0 4px 14px -6px rgba(18,18,20,.22);overflow:hidden;font-family:var(--font);touch-action:manipulation}
+  .cal-mzm button{display:grid;place-items:center;width:36px;height:100%;color:var(--ink-2);background:none;border:0;padding:0}
+  .cal-mzm button+button{border-left:1px solid var(--line)}
+  .cal-mzm button:disabled{color:var(--faint)}
+  .cal-mzm button:active:not(:disabled){background:#F4F4F5}
+  .cal-mzm .pc{width:auto;min-width:46px;padding:0 4px;font-size:12px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+  .cal-mzm .i{width:16px;height:16px}
+  /* дуже вузькі колонки (≤ 75 %): компактна шапка і картки */
+  .cal-m2 .cal-zs .cal-mh.cal-mc{padding:0 2px}
+  .cal-m2 .cal-zs .cal-mc .av{width:24px;height:24px;font-size:9.5px}
+  .cal-m2 .cal-zs .cal-mc .nm{font-size:11px}
+  .cal-m2 .cal-zs .cal-mc .nm small,.cal-m2 .cal-zs .cal-mc .tg{display:none}
+  .cal-m2 .cal-zs .cal-ap{padding:3px 4px 3px 5px;border-left-width:2px;border-radius:7px}
+  .cal-m2 .cal-zs .cal-ap .l1{font-size:10px}
+  .cal-m2 .cal-zs .cal-ap .ic{display:none}
+  .cal-m2 .cal-zs .cal-ap .l2{font-size:11px}
+  .cal-m2 .cal-zs .cal-ap .l3{display:none}
+  .cal-m2 .cal-zs .cal-ap.s1{gap:3px}
+  .cal-m2 .cal-zs .cal-ap.s1 .l1{display:none}
+  .cal-m2 .cal-zs .cal-ap .s1sv{display:none}
+  .cal-m2 .cal-zs .cal-gap button{font-size:0}
   .cal-mnote{padding:6px 16px;font-size:12.5px;color:var(--mute);border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none}
 }
 @media (max-width:399px){
