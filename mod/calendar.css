@@ -545,3 +545,92 @@ button.cal-wc:hover{border-color:var(--ink);}
   .cal-co .cal-sr .n b{font-size:15px}.cal-co .cal-sr .n small{font-size:13px}
   .cal-co .cal-sr .inp-suf{height:44px}.cal-co .cal-sr .inp-suf input{font-size:16px}
 }
+
+/* ═════════ мобільний день v2 (прототип proto-cal): тиждень з точками, колонки майстрів ═════════ */
+@media (max-width:899px){
+  body[data-route="calendar"]:has(.cal-m2) #banners{display:none}
+  body:has(.cal-m2) .top{gap:0}
+  .cal-mon{position:relative;display:inline-flex;align-items:center;gap:4px;font-size:20px;font-weight:600;letter-spacing:-.01em;cursor:pointer}
+  .cal-mon small{font-size:15px;color:var(--mute);margin:0;display:inline}
+  .cal-mon .chev{width:7px;height:7px;border-right:2px solid var(--mute);border-bottom:2px solid var(--mute);transform:translateY(-2px) rotate(45deg);margin:0 3px 0 3px;flex:none}
+  .cal-mon input{position:absolute;inset:0;opacity:0;width:100%;cursor:pointer}
+  .cal-m2{--b:var(--mute)}
+  .cal-wks{display:grid;grid-template-columns:repeat(7,1fr);padding:0 6px 6px;flex:none;border-bottom:1px solid var(--line);touch-action:pan-y}
+  .cal-wsd{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;height:62px;border-radius:14px;min-width:0}
+  .cal-wsd small{font-size:12px;color:var(--mute);font-weight:500}
+  .cal-wsd b{width:34px;height:34px;display:grid;place-items:center;border-radius:50%;font-size:16px;font-weight:500;font-variant-numeric:tabular-nums}
+  .cal-wsd.is-today b{color:var(--accent);font-weight:700}
+  .cal-wsd.is-sel b{background:var(--ink);color:#fff;font-weight:600}
+  .cal-wsd.is-off small,.cal-wsd.is-off b{color:var(--faint)}
+  .cal-wsd.is-sel.is-off b{color:#fff}
+  .cal-dots{display:flex;gap:3px;height:5px}
+  .cal-dots i{width:5px;height:5px;border-radius:50%;background:#D9D9DE}
+  .cal-dots i.on{background:var(--accent)}
+  .cal-wsd.is-sel .cal-dots i.on{background:var(--ink)}
+  /* сітка */
+  .cal-m2 .cal-wrap{--gut:40px;scroll-snap-type:x proximity;scroll-padding-left:var(--gut)}
+  .cal-m2 .cal-hd,.cal-m2 .cal-bd{grid-template-columns:var(--gut) minmax(0,1fr)}
+  .cal-m2 .cal-multi .cal-gridin{min-width:calc(var(--gut) + var(--n)*var(--cw));width:max-content}
+  .cal-m2 .cal-multi .cal-hd,.cal-m2 .cal-multi .cal-bd{grid-template-columns:var(--gut) repeat(var(--n),var(--cw))}
+  .cal-m2 .cal-hd{background:rgba(255,255,255,.97);border-bottom:1px solid var(--line)}
+  .cal-m2 .cal-axh{background:#fff}
+  .cal-m2 .cal-axis{border-right:0;background:#fff}
+  .cal-m2 .cal-axis span{right:6px;margin-top:0;transform:translateY(-50%);font-size:11.5px}
+  .cal-m2 .cal-axis span:first-child{display:none}
+  .cal-m2 .cal-col{scroll-snap-align:start}
+  .cal-m2 .cal-col.is-today{background-color:#fff}
+  .cal-m2 .cal-solo .cal-hd{display:none}
+  /* шапка майстра */
+  .cal-m2 .cal-mh.cal-mc{height:60px;padding:0 4px;flex-direction:column;flex-wrap:nowrap;align-items:center;justify-content:center;gap:4px;border-left:0;text-align:center;background:transparent;scroll-snap-align:start}
+  .cal-m2 .cal-mc .r1{flex:none;position:relative;gap:0}
+  .cal-m2 .cal-mc .av{width:30px;height:30px;font-size:11px}
+  .cal-m2 .cal-mc .cal-wn{position:absolute;top:-4px;right:-8px}
+  .cal-m2 .cal-mc .nm{font-size:12.5px;font-weight:600;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2}
+  .cal-m2 .cal-mc .nm small{font-weight:500;color:var(--mute);margin-left:3px}
+  .cal-m2 .cal-mc .tg{font-size:10.5px;font-weight:600;color:var(--mute);background:#F1F1F3;border-radius:6px;padding:1px 5px;line-height:15px;white-space:nowrap}
+  .cal-m2 .cal-mc.is-off{opacity:.55}
+  /* вихідні, неробочі години, перерва */
+  .cal-m2 .cal-off{background:#FAFAFB}
+  .cal-m2 .cal-off.all{background:repeating-linear-gradient(135deg,#F6F6F7 0 6px,#fff 6px 12px)}
+  .cal-m2 .cal-off.brk{left:3px;right:3px;border:0;border-radius:10px;background:repeating-linear-gradient(135deg,#EFEFF1 0 6px,#F8F8F9 6px 12px)}
+  .cal-m2 .cal-off.all span,.cal-m2 .cal-off.brk span{background:none;padding:0;color:var(--mute);font-size:11.5px}
+  /* лінія «зараз» */
+  .cal-m2 .cal-now{border-top:2px solid #E5484D}
+  .cal-m2 .cal-now::before{display:none}
+  .cal-m2 .cal-nowlbl{left:2px;right:auto;background:#E5484D;font-size:11px;padding:1px 4px;border-radius:6px}
+  /* картки: колір статусу як у прототипі */
+  .cal-m2 .cal-ap{border:0;border-left:3px solid var(--b);border-radius:10px;padding:5px 7px 5px 9px;gap:1px;line-height:1.22;background:var(--sb,#F1F1F3);color:var(--ink)}
+  .cal-m2 .cal-ap.st-new{--b:#5B6EE1;--sb:#E9EEFF;--si:#2B3A9E}
+  .cal-m2 .cal-ap.st-ok{--b:#2E9E63;--sb:#E3F4EA;--si:#17643D}
+  .cal-m2 .cal-ap.st-here{--b:#E39A1C;--sb:#FFF0D6;--si:#7A4A00}
+  .cal-m2 .cal-ap.st-paid{--b:#B5B5BC;--sb:#F1F1F3;--si:#55555C}
+  .cal-m2 .cal-ap.st-noshow{--b:#D64545;--sb:#FDE7E7;--si:#9B1C1C}
+  .cal-m2 .cal-ap.st-cancel{--b:#D9D9DE;--sb:#F7F7F8;--si:var(--faint)}
+  .cal-m2 .cal-ap.is-block{--b:#B5B5BC;--sb:repeating-linear-gradient(135deg,#EFEFF1 0 6px,#F8F8F9 6px 12px);--si:var(--mute)}
+  .cal-m2 .cal-ap .l1{font-size:11.5px;color:var(--si)}
+  .cal-m2 .cal-ap .tm{color:var(--si);opacity:.85}
+  .cal-m2 .cal-ap .tm::before{display:none}
+  .cal-m2 .cal-ap .l2{font-size:13.5px;color:var(--ink)}
+  .cal-m2 .cal-multi .cal-ap:not(.s1) .l2{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word}
+  .cal-m2 .cal-ap.st-paid .l2{color:var(--si)}
+  .cal-m2 .cal-ap .l3{font-size:12px;color:var(--ink-2);opacity:.85}
+  .cal-m2 .cal-ap.s1 .l2{font-size:12.5px}
+  .cal-m2 .cal-ap .cal-ic{color:var(--si);opacity:.8}
+  .cal-m2 .cal-ap .ft{margin-top:auto;display:flex;justify-content:space-between;align-items:center;gap:6px}
+  .cal-m2 .cal-ap .pr{font-size:12px;font-weight:600;color:var(--ink-2);font-variant-numeric:tabular-nums}
+  .cal-m2 .cal-ap .stc{font-size:11px;font-weight:600;border-radius:999px;padding:2px 7px;white-space:nowrap;background:rgba(255,255,255,.7);color:var(--si)}
+  .cal-m2 .cal-gap button{border-radius:10px}
+  /* зведення майстра */
+  .cal-msum{display:flex;align-items:center;gap:12px;padding:8px 16px;font-size:13px;color:var(--mute);border-bottom:1px solid var(--line);flex:none;font-variant-numeric:tabular-nums}
+  .cal-msum b{color:var(--ink);font-weight:600}
+  .cal-msum .bar{flex:1;height:4px;border-radius:2px;background:#E9E9EC;overflow:hidden;min-width:24px}
+  .cal-msum .bar i{display:block;height:100%;background:var(--accent);border-radius:2px}
+  .cal-mnote{padding:6px 16px;font-size:12.5px;color:var(--mute);border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none}
+}
+@media (max-width:399px){
+  body:has(.cal-m2) #top-x [data-act="cal-sidebtn"]{display:none}
+}
+@media (max-width:359px){
+  .cal-m2 .cal-wrap{--gut:36px}
+  .cal-mon{font-size:16.5px;gap:2px}
+}

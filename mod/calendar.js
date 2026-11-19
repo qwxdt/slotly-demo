@@ -212,6 +212,39 @@ function mobChips(){
   return h+'</div>';
 }
 
+/* ───────── мобільний день v2: тиждень з точками, колонки майстрів, зведення майстра ───────── */
+var WDS2=['Пн','Вт','Ср','Чт','Пт','Сб','Нд'];
+var ST_SHORT={new:'Нова',confirmed:'Підтв.',arrived:'Прийшла',done:'Завершено',noshow:'Не прийшла',cancelled:'Скасовано'};
+function wkHtml(){
+  var a0=D.weekStart(S.d),T=App.today(),me=App.db.meId;
+  var ms=canAll()?visibleMasters():visibleMasters().filter(function(m){return m.id===me});
+  var h='<div class="cal-wks">';
+  for(var i=0;i<7;i++){
+    var d=D.add(a0,i),cap=0,bk=0,n=0;
+    ms.forEach(function(m){var st=dayStats(d,m.id);cap+=st.cap;bk+=st.booked;n+=st.n});
+    var p=cap?bk/cap*100:0,lv=p>=70?3:p>=40?2:(p>0||n)?1:0;
+    h+='<button class="cal-wsd'+(d===S.d?' is-sel':'')+(d===T?' is-today':'')+(!cap&&!n?' is-off':'')+'" data-act="cal-day" data-d="'+d+'" aria-pressed="'+(d===S.d)+'"><small>'+WDS2[i]+'</small><b>'+D.parse(d).getDate()+'</b><span class="cal-dots">'+[0,1,2].map(function(j){return '<i'+(j<lv?' class="on"':'')+'></i>'}).join('')+'</span></button>';
+  }
+  return h+'</div>';
+}
+function monTitle(){
+  var t=document.getElementById('ttl');if(!t)return;
+  var p=D.parse(S.d),y=p.getFullYear();
+  t.innerHTML='<label class="cal-mon">'+esc(D.MONN[p.getMonth()])+(y!==D.parse(App.today()).getFullYear()?' <small>'+y+'</small>':'')+'<span class="chev"></span><input type="date" value="'+S.d+'" aria-label="Обрати дату"></label>';
+  t.querySelector('input').addEventListener('change',function(){if(this.value)go({d:this.value})});
+}
+function mobHead(m,date){
+  var st=dayStats(date,m.id),off=App.timeOff(m.id,date),wn=waitCountFor(m.id,date);
+  var tg=!st.wh?(off?(OFFKIND[off.kind]||'Відсутня'):'вихідний').toLowerCase():'';
+  return '<button class="cal-mh cal-mc'+(st.wh?'':' is-off')+'" data-act="cal-mhead" data-m="'+m.id+'" title="Тиждень: '+esc(m.n)+'"><span class="r1">'+UI.av(m,'')+(wn?'<span class="cal-wn">'+wn+'</span>':'')+'</span>'+
+    '<span class="nm">'+esc(m.short)+(st.wh&&st.n?'<small>'+st.n+'</small>':'')+'</span>'+(tg?'<span class="tg">'+esc(tg)+'</span>':'')+'</button>';
+}
+function msumHtml(){
+  var me=App.db.meId,st=dayStats(S.d,me);
+  var done=App.apptsOn(S.d,me).filter(function(a){return !isBlock(a)&&a.status==='done'}).length;
+  return '<div class="cal-msum"><span><b>'+st.n+' '+U.plural(st.n,'запис','записи','записів')+'</b> · '+done+' готово</span><span class="bar"><i style="width:'+(st.n?Math.round(done/st.n*100):0)+'%"></i></span><span><b>'+(st.plan?U.uah(st.plan):'—')+'</b></span></div>'+(App.db.dayNotes[S.d]?'<div class="cal-mnote">'+esc(App.db.dayNotes[S.d])+'</div>':'');
+}
+
 /* ───────── роут ───────── */
 App.route('calendar',{title:'Календар',icon:'cal',nav:true,group:'work',order:2,perm:'calendar.all',permAlt:'calendar.own',
   count:function(){
@@ -225,24 +258,24 @@ App.route('calendar',{title:'Календар',icon:'cal',nav:true,group:'work',
     if(old)S.scr={t:old.scrollTop,l:old.scrollLeft};
     readQ(q);
     if(S.v==='day'&&isMob()){
-      var ms=visibleMasters();
+      /* v2: власниця бачить усіх майстрів колонками, майстер — свій день */
       if(!canAll())S.mobM=App.db.meId;
       else if(S.m)S.mobM=S.m;
-      else if(S.mobM==='*'){}
-      else if(!S.mobM||!ms.find(function(m){return m.id===S.mobM})){
-        var w=ms.find(function(m){return App.workHours(m.id,S.d)});S.mobM=(w||ms[0]||{}).id||'';
-      }
+      else S.mobM='*';
     }else if(isMob()){
+      if(S.mobM==='*')S.mobM='';
       if(S.m)S.mobM=S.m;else if(!canAll())S.mobM=App.db.meId;else if(S.v==='list')S.mobM='';
       else if(S.v==='week'&&!S.mobM)S.mobM='';
     }
     if(S.v==='list'&&!q.r)S.r=S.r||'day';
     if(!isMob())localStorage.setItem(LS_V,S.v);
     App.setTop(isMob()?'<button class="icobtn" data-act="cal-sidebtn" aria-label="Зведення" title="Зведення дня">'+I('chart')+'</button><button class="icobtn" data-act="cal-more-menu" aria-label="Ще">'+I('more')+'</button>':topHtml());
-    view.innerHTML='<div class="cal cal-v-'+S.v+(S.move?' is-move':'')+'">'+(isMob()?mobBarHtml()+mobChips():'')+(S.move?moveBarHtml():'')+
+    var m2=isMob()&&S.v==='day';
+    view.innerHTML='<div class="cal cal-v-'+S.v+(m2?' cal-m2':'')+(S.move?' is-move':'')+'">'+(m2?wkHtml():isMob()?mobBarHtml()+mobChips():'')+(S.move?moveBarHtml():'')+
       (S.v==='day'?dayHtml():S.v==='week'?weekHtml():listHtml())+
       '</div>';
     afterRender(view);
+    if(m2){monTitle();setTimeout(function(){if(App.cur&&App.cur.rt.id==='calendar'&&isMob()&&S.v==='day')monTitle()},0)}
   }
 });
 var _rt=null;
@@ -304,6 +337,7 @@ function apptBlockHtml(a,lo,ppm,fv,ln){
   var inner='<div class="l1"><span class="tm">'+tm+'</span><span class="ic">'+iconsFor(a,fv)+'</span></div>'+
     '<div class="l2">'+esc(title)+(size==='s1'&&dur>=45?'<span class="s1sv"> · '+esc(sv)+'</span>':'')+'</div>'+
     (size!=='s1'&&(dur>=45||a.block)&&sv?'<div class="l3">'+esc(sv)+'</div>':'');
+  if(S._one&&h>70&&!a.block)inner+='<div class="ft"><span class="pr">'+U.uah(App.apptTotal(a))+'</span><span class="stc">'+(ST_SHORT[a.status]||'')+'</span></div>';
   if(dur>=90&&!isMob()&&!a.block&&a.client&&App.canSeePhone()){var c=cl(a.client);if(c&&c.ph)inner+='<div class="l4">'+esc(App.phoneOf(c))+'</div>'}
   return '<div class="'+cls+' '+size+'" data-id="'+a.id+'" style="'+st+'" tabindex="0" role="button" aria-label="'+esc(title+', '+tm)+'">'+inner+(MOVABLE[a.status]&&!isMob()?'<i class="cal-rs" title="Змінити тривалість"></i>':'')+'</div>';
 }
@@ -341,6 +375,7 @@ function offHtml(col,lo,hi,ppm){
 }
 function gridHtml(cols,o){
   o=o||{};
+  S._one=isMob()&&S.v==='day'&&cols.length===1;
   var rg=colRange(cols),lo=rg[0],hi=rg[1],ppm=ppmNow(),T=App.today(),nowM=D.nowMin();
   var fv=firstVisitMap(),step=stepMin();
   var H=(hi-lo)*ppm;
@@ -359,11 +394,13 @@ function gridHtml(cols,o){
     body+='<div class="cal-col'+(c.date===T?' is-today':'')+(c.date<T?' is-past':'')+'" data-staff="'+c.staff+'" data-date="'+c.date+'" style="height:'+H+'px">'+offHtml(c,lo,hi,ppm)+(S.move?moveZones(c,lo,ppm):gapsFor(c,lo,ppm))+
       list.map(function(x){return apptBlockHtml(x,lo,ppm,fv,ln[x.id])}).join('')+a+'</div>';
   });
-  var minW=o.minCol||(isMob()?(S.v==='day'&&S.mobM==='*'&&cols.length>1?(window.innerWidth<360?132:110):0):160);
-  return '<div class="cal-wrap" data-lo="'+lo+'" data-hi="'+hi+'" data-ppm="'+ppm+'" data-step="'+step+'" style="--ppm:'+ppm+';--step:'+(step*ppm)+'px;--n:'+cols.length+';--cw:'+minW+'px">'+
+  var m2=isMob()&&S.v==='day',gut=window.innerWidth<360?36:40;
+  var minW=o.minCol||(isMob()?(S.v==='day'&&S.mobM==='*'&&cols.length>1?Math.max(100,Math.floor((window.innerWidth-gut)/3.25)):0):160);
+  return '<div class="cal-wrap'+(m2?(cols.length>1?' cal-multi':' cal-one')+(!canAll()?' cal-solo':''):'')+'" data-lo="'+lo+'" data-hi="'+hi+'" data-ppm="'+ppm+'" data-step="'+step+'" style="--ppm:'+ppm+';--step:'+(step*ppm)+'px;--n:'+cols.length+';--cw:'+minW+'px">'+
     '<div class="cal-gridin">'+head+'<div class="cal-bd" style="height:'+H+'px">'+axis+body+'</div></div></div>';
 }
 function masterHead(m,date){
+  if(isMob()&&S.v==='day'&&S.mobM==='*')return mobHead(m,date);
   var st=dayStats(date,m.id),lv=App.level(m.lvl);
   var T=App.today();
   var sum=date<=T?st.earned:st.plan;
@@ -380,7 +417,7 @@ function dayCols(){
   else if(S.m)ms=ms.filter(function(m){return m.id===S.m});
   ms.forEach(function(m){
     var wh=App.workHours(m.id,date),has=App.apptsOn(date,m.id).some(function(a){return S.showCancelled||a.status!=='cancelled'});
-    var explicit=S.m||(isMob()&&!mall);
+    var explicit=S.m||isMob();
     if(!wh&&!has&&!explicit&&!S.showOff)return;
     var off=App.timeOff(m.id,date);
     cols.push({key:m.id,staff:m.id,date:date,wh:wh,off:off?{label:(OFFKIND[off.kind]||'Відсутня')+(off.note&&off.note!==OFFKIND[off.kind]?' · '+off.note:'')}:null,head:masterHead(m,date)});
@@ -408,7 +445,8 @@ function subHtml(){
 function dayHtml(){
   var cols=dayCols(),h='';
   if(!isMob())h+=subHtml();
-  h+=noteStripHtml();
+  if(!isMob())h+=noteStripHtml();
+  else if(!canAll())h+=msumHtml();
   h+='<div class="cal-main"><div class="cal-center">';
   if(!cols.length){
     h+='<div class="cal-emptyday">'+UI.empty('cal','Сьогодні ніхто не працює','Вихідний або всі майстри у відпустці. Можна додати запис вручну.','<div class="row" style="margin-top:8px"><button class="btn" data-act="cal-showoff">Показати всіх майстрів</button><button class="btn pri" data-act="cal-new">Новий запис</button></div>')+'</div>';
@@ -652,6 +690,9 @@ act('wl-del',function(el){var id=el.dataset.id;var w=App.db.waitlist.find(functi
 act('wl-find',function(el){waitlistFind(el.dataset.id)});
 act('more-menu',function(el){
   var L=[];
+  if(isMob()&&S.v==='day'){if(window.innerWidth<400)L.push({ic:'chart',t:'Зведення дня',fn:function(){var b=document.querySelector('#top-x [data-act="cal-sidebtn"]');if(b)b.click()}});
+    if(S.d!==App.today())L.push({ic:'cal',t:'Сьогодні',fn:function(){go({d:App.today()})}});
+    L.push({ic:'cal',t:'Тиждень',fn:function(){go({v:'week'})}});L.push({ic:'cal',t:'Список',fn:function(){go({v:'list',r:'day'})}})}
   if(S.v!=='list')L.push({ic:'cal',t:'Записи за місяць',fn:function(){go({v:'list',r:'month'})}});
   L.push({ic:'x',t:S.showCancelled?'Сховати скасовані':'Показати скасовані',fn:function(){go({xc:S.showCancelled?'':1},true)}});
   if(S.v==='day')L.push({ic:'door',t:S.showOff?'Сховати вихідних майстрів':'Показати вихідних майстрів',fn:function(){go({off:S.showOff?'':1},true)}});
@@ -856,7 +897,7 @@ function dragEnd(){
     on=false;lock=0;
     if(!isMob()||!App.cur||App.cur.rt.id!=='calendar'||S.v==='list')return;
     if(e.target.closest('.cal-chips,.cal-mbar,.cal-movebar,input,select'))return;
-    el=e.target.closest('.cal-wrap,.cal-wkl');if(!el)return;
+    el=e.target.closest('.cal-wrap,.cal-wkl,.cal-wks');if(!el)return;
     if(el.scrollWidth>el.clientWidth+4)return; /* «Усі» з горизонтальним скролом — не заважаємо */
     on=true;sx=e.touches[0].clientX;sy=e.touches[0].clientY;t0=Date.now();
   },{passive:true});
@@ -869,7 +910,7 @@ function dragEnd(){
     if(!on)return;on=false;var t=e.changedTouches[0],dx=t.clientX-sx;
     var ok=lock===1&&(Math.abs(dx)>window.innerWidth*.3||(Math.abs(dx)>60&&Date.now()-t0<300));
     if(el){el.style.transition='transform .18s,opacity .18s';el.style.transform='';el.style.opacity='';var e2=el;setTimeout(function(){e2.style.transition=''},200)}
-    if(ok)go({d:shiftDate(dx<0?1:-1)});
+    if(ok)go({d:el&&el.classList.contains('cal-wks')?D.add(S.d,dx<0?7:-7):shiftDate(dx<0?1:-1)});
   },{passive:true});
 })();
 
