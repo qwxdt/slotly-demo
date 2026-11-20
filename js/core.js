@@ -188,7 +188,7 @@ function seed(){
      reminders:{h24:true,h2:true,afterVisit:true,returnDays:28,channel:'tg'},
      noshow:{markAfter:15,warnAt:2,blockAt:3},
      accounting:{certRevenue:'redeem',tipsToMaster:100,cardFeePct:1.3,cashRegister:false,dayClose:true,roundTo:0},
-     payroll:{period:'half',basis:'afterDiscount',certAsRevenue:true,productPctDefault:10},
+     payroll:{period:'half',basis:'afterDiscount',freeVisit:'price',certAsRevenue:true,productPctDefault:10},
      alert:{on:false,mode:'pause',region:'Черкаська область'},
      offline:false,
      export:{last:null}
@@ -391,7 +391,7 @@ App.migrate=function(db){
   db.notifs=db.notifs||[];db.photos=db.photos||[];db.msgs=db.msgs||[];db.campaigns=db.campaigns||[];
   db.waitlist=db.waitlist||[];db.waitlist.forEach(function(w){w.status=w.status||'wait'});
   var st=db.settings;st.access=st.access||{hidePhones:false,masterPay:true,masterBook:true};
-  st.payroll=st.payroll||{};if(st.payroll.certSalePct==null)st.payroll.certSalePct=5;if(st.payroll.abonSalePct==null)st.payroll.abonSalePct=5;
+  st.payroll=st.payroll||{};if(st.payroll.certSalePct==null)st.payroll.certSalePct=5;if(!st.payroll.freeVisit)st.payroll.freeVisit='price';if(st.payroll.abonSalePct==null)st.payroll.abonSalePct=5;
   var r=st.reminders||{};
   st.notify=st.notify||{confirm:true,h24:r.h24!==false,h2:r.h2!==false,review:r.afterVisit!==false,reviewDelayH:3,returnDays:r.returnDays||28,quietFrom:'21:00',quietTo:'09:00',cascade:['tg','viber','sms'],team:true,tpl:Object.assign({},TPL)};
   st.telegram=st.telegram||{bot:'@sola_beauty_bot',clientBot:true,teamBot:true,connected:true};
@@ -613,10 +613,12 @@ App.payroll=function(staffId,from,to,noCarry){
       /* MONEY-SPEC I9: знижка ділиться між послугами цілими гривнями (накопичувальне округлення) — Σ баз = сума візиту, Σ рядків = нараховано */
       cum+=x.price;var dCum=g?Math.round(disc*cum/g):0,dShare=dCum-prevD;prevD=dCum;
       if(who(a,x)!==staffId)return;
-      var base=Math.round(acc.basis==='afterDiscount'?x.price-dShare:x.price);
+      /* рішення Егора 20.11: безкоштовний візит (знижка ≥ суми) — % з прайсу або 0 (налаштування freeVisit, прапорець візиту noPct перекриває) */
+      var free=g>0&&disc>=g,zero=free&&(a.noPct!=null?!!a.noPct:acc.freeVisit==='zero');
+      var base=free?(zero?0:x.price):Math.round(acc.basis==='afterDiscount'?x.price-dShare:x.price);
       var p=cfg.svc&&cfg.svc[x.svc]!=null?cfg.svc[x.svc]:dayPct;
       var e=cfg.type==='fixed'?0:Math.round(base*p/100);
-      svcSum+=base;earn+=e;lines.push({kind:'svc',appt:a.id,date:a.date,svc:x.svc,base:base,pct:p,earn:e,client:a.client});
+      svcSum+=base;earn+=e;lines.push({kind:'svc',appt:a.id,date:a.date,svc:x.svc,base:base,pct:p,earn:e,client:a.client,free:free||undefined});
     });
   });
   /* F66: % продавцю за сертифікати й абонементи */
@@ -699,8 +701,22 @@ function needOpen(date,cash){if(!cash)return;var dc=App.db.dayClose||{};
 /* fixB B7: права перевіряє і сама операція, не лише екран */
 function needPerm(){for(var i=0;i<arguments.length;i++)if(App.can(arguments[i]))return;moneyErr('Немає прав на цю дію')}
 /* fixB B10: каса не йде в мінус — ні на дату операції, ні на будь-який наступний день до сьогодні */
-function needCash(date,amount){var T=App.today(),d=date,min=Infinity,n=0;while(d<=T&&n++<400){min=Math.min(min,App.cashBalance(d));d=D.add(d,1)}if(min===Infinity)min=App.cashBalance(date);
-  if(amount>min)moneyErr('У касі лише '+U.uah(Math.max(0,min))+' готівки — видати '+U.uah(amount)+' не можна')}
+/* рішення Егора 20.11: більше за касу — лише з явним підтвердженням (force); тоді повертає, на скільки каса піде в мінус */
+function cashMin(date){var T=App.today(),d=date,min=Infinity,n=0;while(d<=T&&n++<400){min=Math.min(min,App.cashBalance(d));d=D.add(d,1)}if(min===Infinity)min=App.cashBalance(date);return min}
+function needCash(date,amount,force){var min=cashMin(date);if(amount<=min)return 0;
+  if(!force)moneyErr('У касі лише '+U.uah(Math.max(0,min))+' готівки — видати '+U.uah(amount)+' можна лише з підтвердженням «Все одно провести»');
+  return amount-Math.max(0,min)}
+function negTxt(n){return n>0?' · каса в мінусі на '+U.uah(n):''}
+/* безкоштовний візит: чи виплачено вже зарплату майстра за період цього візиту */
+function salaryPaidFor(staff,date){return App.db.payouts.some(function(p){return p.staff===staff&&p.type==='salary'&&p.date>=date})}
+App.cashMin=cashMin;App.salaryPaidFor=salaryPaidFor;
+App.isFreeVisit=function(a){var g=U.sum(a.items,function(x){return x.price});return g>0&&App.apptDiscount(a)>=g};
+App.noPctOn=function(a){return a.noPct!=null?!!a.noPct:App.db.settings.payroll.freeVisit==='zero'};
+/* прапорець «Без % майстру» на вже закритому візиті; після виплати зарплати за цей візит — не міняємо заднім числом */
+O.setNoPct=function(id,on){var a=App.appt(id);if(!a)moneyErr('Запис не знайдено');needPerm('checkout');
+  if(!App.isFreeVisit(a))moneyErr('«Без % майстру» — лише для безкоштовного візиту (до сплати 0 ₴)');
+  if(a.status==='done'&&salaryPaidFor(a.staff,a.date))moneyErr('Зарплату за цей візит уже виплачено — змінити % заднім числом не можна');
+  a.noPct=!!on;log('edit','appt:'+id,(on?'Без % майстру':'% майстру з прайсу')+' — безкоштовний візит');App.save();return a};
 App.needOpen=needOpen;App.needPerm=needPerm;App.needCash=needCash;
 /* якщо форма не зловила помилку сама — показуємо її тостом, а не мовчимо */
 if(typeof window!=='undefined')window.addEventListener('error',function(ev){var e=ev.error;if(e&&e.money&&App.ui&&App.ui.toast){App.ui.toast(e.message,{type:'err'});ev.preventDefault()}});
@@ -733,7 +749,10 @@ O.checkout=function(id,o){
       if(abAmt<=0)moneyErr('За цей візит нема чого списувати з абонемента')}
     var rest=due-certAmt-abAmt,sumL=U.sum(lines,function(l){return l.amount});
     if(sumL>rest)moneyErr('Переплата '+U.uah(sumL-rest)+': до сплати лише '+U.uah(rest)+'. Зайве — здачею або окремою передоплатою');
+    if(o.noPct!=null&&!App.isFreeVisit(a))moneyErr('«Без % майстру» — лише для безкоштовного візиту (до сплати 0 ₴)');
   }catch(err){if(disc0===undefined)delete a.discount;else a.discount=disc0;throw err}
+  /* фіксуємо рішення на момент закриття: пізніша зміна налаштування не переписує вже закриті візити */
+  if(App.isFreeVisit(a))a.noPct=o.noPct!=null?!!o.noPct:App.db.settings.payroll.freeVisit==='zero';else delete a.noPct;
   lines.forEach(function(l){db.payments.push({id:U.uid('p'),appt:id,date:T,ts:ts,method:l.method,amount:l.amount,kind:'service',staff:a.staff,by:db.meId})});
   if(g){g.balance-=certAmt;if(g.balance<=0){g.balance=0;g.status='used'}
     db.payments.push({id:U.uid('p'),appt:id,cert:g.id,date:T,ts:ts,method:'cert',amount:certAmt,kind:'cert',staff:a.staff,by:db.meId});}
@@ -767,9 +786,9 @@ O.mergeClients=function(keepId,dropId){var db=App.db;db.appts.forEach(function(a
 O.deleteClient=function(id){var c=App.client(id);App.db.clients=App.db.clients.filter(function(x){return x.id!==id});App.db.appts.forEach(function(a){if(a.client===id)a.client=null});log('delete','client:'+id,'Видалено клієнта '+(c&&c.n));App.save()};
 O.addExpense=function(e){needAmt(e.amount,'Сума витрати');needPerm('expenses.add','expenses.*');needOpen(e.date||App.today(),e.method==='cash');if(e.method==='cash')needCash(e.date||App.today(),e.amount);e.id=U.uid('e');e.by=App.db.meId;e.date=e.date||App.today();App.db.expenses.push(e);log('create','exp:'+e.id,'Витрата: '+e.note+' '+U.uah(e.amount));App.save();return e};
 O.deleteExpense=function(id){var e=App.db.expenses.find(function(x){return x.id===id});if(e)needOpen(e.date,e.method==='cash');App.db.expenses=App.db.expenses.filter(function(x){return x.id!==id});log('delete','exp:'+id,'Видалено витрату '+(e?U.uah(e.amount):''));App.save();return e};
-O.cashOp=function(o){needAmt(o.amount,'Сума');needPerm('cash.ops');needOpen(o.date||App.today(),true);if(o.type!=='in')needCash(o.date||App.today(),o.amount);o.id=U.uid('co');o.by=App.db.meId;o.date=o.date||App.today();App.db.cashOps.push(o);log('cash','cash:'+o.id,(o.type==='in'?'Внесення ':'Вилучення ')+U.uah(o.amount)+' — '+o.note);App.save();return o};
+O.cashOp=function(o){needAmt(o.amount,'Сума');needPerm('cash.ops');needOpen(o.date||App.today(),true);var neg=o.type!=='in'?needCash(o.date||App.today(),o.amount,o.force):0;delete o.force;if(neg)o.neg=neg;o.id=U.uid('co');o.by=App.db.meId;o.date=o.date||App.today();App.db.cashOps.push(o);log('cash','cash:'+o.id,(o.type==='in'?'Внесення ':'Вилучення ')+U.uah(o.amount)+' — '+o.note+negTxt(neg));App.save();return o};
 O.closeDay=function(date,counted,note){needPerm('cash.ops','cash.close');if(!isInt(counted)||counted<0)moneyErr('Пораховано має бути цілим числом, не менше нуля');if(App.db.dayClose[date])moneyErr('День '+D.human(date)+' уже закрито');var exp=App.cashBalance(date);App.db.dayClose[date]={counted:counted,expected:exp,diff:counted-exp,note:note||'',by:App.db.meId,ts:App.today()+'T'+U.hm(D.nowMin())};log('close','day:'+date,'Закриття дня: розбіжність '+U.uah(counted-exp));App.save();O.notify('day','День закрито: розбіжність '+U.uah(counted-exp),'cash','all')};
-O.payout=function(o){needAmt(o.amount,'Сума');needPerm('payroll.pay');if(!App.staff(o.staff))moneyErr('Працівника не знайдено');if(o.type==='salary'||o.type==='advance'){needOpen(o.date||App.today(),o.method==='cash');if(o.method==='cash')needCash(o.date||App.today(),o.amount)}o.id=U.uid('po');o.by=App.db.meId;o.date=o.date||App.today();App.db.payouts.push(o);var s=App.staff(o.staff);log('payout','staff:'+o.staff,({salary:'Виплата',advance:'Аванс',bonus:'Премія',fine:'Штраф'}[o.type])+' '+s.short+' '+U.uah(o.amount));App.save();return o};
+O.payout=function(o){needAmt(o.amount,'Сума');needPerm('payroll.pay');if(!App.staff(o.staff))moneyErr('Працівника не знайдено');if(o.type==='salary'||o.type==='advance'){needOpen(o.date||App.today(),o.method==='cash');if(o.method==='cash')var neg=needCash(o.date||App.today(),o.amount,o.force)}delete o.force;if(neg)o.neg=neg;o.id=U.uid('po');o.by=App.db.meId;o.date=o.date||App.today();App.db.payouts.push(o);var s=App.staff(o.staff);log('payout','staff:'+o.staff,({salary:'Виплата',advance:'Аванс',bonus:'Премія',fine:'Штраф'}[o.type])+' '+s.short+' '+U.uah(o.amount)+negTxt(neg));App.save();return o};
 O.sellCert=function(o){var db=App.db;needAmt(o.nominal,'Номінал сертифіката');needMeth(o.method);needOpen(App.today(),o.method==='cash');var g={id:U.uid('g'),code:'SB-'+(5000+db.certs.length*137%4999),nominal:o.nominal,balance:o.nominal,buyer:o.buyer||null,recipient:o.recipient||'',sold:App.today(),expires:D.add(App.today(),o.days||180),status:'active',note:o.note||'',method:o.method};
   db.certs.push(g);db.payments.push({id:U.uid('p'),cert:g.id,appt:null,date:App.today(),ts:App.today()+'T'+U.hm(D.nowMin()),method:o.method,amount:o.nominal,kind:'cert_sale',staff:null,by:db.meId});log('create','cert:'+g.id,'Продано сертифікат '+g.code+' на '+U.uah(o.nominal));App.save();return g};
 O.sellAbon=function(o){var db=App.db,t=db.abonTypes.find(function(x){return x.id===o.type});if(!t)moneyErr('Тип абонемента не знайдено');needMeth(o.method);needAmt(o.price||t.price,'Ціна абонемента');needOpen(App.today(),o.method==='cash');var ab={id:U.uid('ab'),type:t.id,client:o.client,left:t.qty,qty:t.qty,sold:App.today(),expires:D.add(App.today(),t.days),status:'active',price:o.price||t.price};

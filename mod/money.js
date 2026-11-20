@@ -173,7 +173,7 @@ function renderCash(view,params,q){
     (rec&&isBoss()?'<button class="btn" data-a="reopen">'+I('undo')+' Відкрити день знову</button>':'')+'</div>';
   /* KPI */
   h+='<div class="kpis mn-kpis mn-kpis4">'+
-    kpi('В касі зараз',uah(dd.close),'готівка за обліком')+
+    kpi('В касі зараз',dd.close<0?'<span class="dng-t">'+uah(dd.close)+'</span>':uah(dd.close),dd.close<0?'каса в мінусі':'готівка за обліком',dd.close<0?'dng-t':'')+
     kpi('Виторг',uah(m.revenue),m.visits+' '+plural3(m.visits,'візит','візити','візитів')+(m.avgCheck?' · чек '+uah(m.avgCheck):''))+
     kpi('Готівка',uah(dd.cashIn),m.tips?'з них чайові '+uah(m.tips):'надійшло за день')+
     kpi('Картка',uah(dd.byKind.card),dd.byKind.transfer?'+ перекази '+uah(dd.byKind.transfer):(dd.byKind.card?'у виписці '+uah(netBank(m.byMethod,'card')):'—'))+'</div>';
@@ -196,7 +196,7 @@ function renderCash(view,params,q){
   /* витрати + виплати + операції */
   var rowsOut=[];
   dd.exps.forEach(function(e){rowsOut.push('<div class="li"><div class="t"><b class="ell">'+esc(e.note||expCat(e.cat))+'</b><small>'+esc(expCat(e.cat))+' · '+esc(mName(e.method))+'</small></div><b class="num mn-amt dng-t">−'+uah(e.amount)+'</b>'+(expEditable(e)?'<button class="icobtn sm ghost" data-a="expmenu" data-id="'+e.id+'" aria-label="Дії">'+I('more')+'</button>':'')+'</div>')});
-  dd.pouts.forEach(function(p){rowsOut.push('<div class="li"><div class="t"><b class="ell">'+(p.type==='advance'?'Аванс':'Зарплата')+' · '+esc(sname(p.staff))+'</b><small>Виплата · '+esc(mName(p.method))+(p.note?' · '+esc(p.note):'')+'</small></div><b class="num mn-amt dng-t">−'+uah(p.amount)+'</b><span class="mn-sp"></span></div>')});
+  dd.pouts.forEach(function(p){rowsOut.push('<div class="li"><div class="t"><b class="ell">'+(p.type==='advance'?'Аванс':'Зарплата')+' · '+esc(sname(p.staff))+'</b><small>Виплата · '+esc(mName(p.method))+(p.note?' · '+esc(p.note):'')+(p.neg?' · <span class="dng-t">каса в мінусі</span>':'')+'</small></div><b class="num mn-amt dng-t">−'+uah(p.amount)+'</b><span class="mn-sp"></span></div>')});
   h+='<div class="card flush"><div class="card-h"><b>Витрати та виплати</b><span class="pill-n">'+rowsOut.length+'</span><span class="sp"></span>'+(canAddExp()?'<button class="btn sm" data-a="exp">'+I('plus','s')+' Додати</button>':'')+'</div>'+
     (rowsOut.length?'<div class="list">'+rowsOut.join('')+'</div>':'<div class="mn-none">Витрат за день немає</div>')+'</div>';
   h+='</div>';
@@ -207,8 +207,8 @@ function renderCash(view,params,q){
   /* готівка */
   h+='<div class="card mn-card"><h3>Готівка в касі</h3><div class="mn-rec">'+
     recRow('На початок дня',dd.open)+recRow('Оплати готівкою',dd.cashIn,'+')+(dd.cashExp?recRow('Витрати готівкою',-dd.cashExp):'')+(dd.cashPay?recRow('Виплати зарплат готівкою',-dd.cashPay):'')+
-    dd.ops.map(function(o){return '<div class="mn-rr"><span>'+(o.type==='in'?'Внесення':'Інкасація')+(o.note?' · <i>'+esc(o.note)+'</i>':'')+'</span><b class="num '+(o.type==='in'?'':'dng-t')+'">'+(o.type==='in'?'+':'−')+uah(o.amount)+'</b>'+(ops?'<button class="icobtn sm ghost" data-a="opdel" data-id="'+o.id+'" aria-label="Видалити">'+I('trash','s')+'</button>':'')+'</div>'}).join('')+
-    '<div class="mn-rr tot"><span>Має бути в касі</span><b class="num">'+uah(dd.close)+'</b></div></div>'+
+    dd.ops.map(function(o){return '<div class="mn-rr"><span>'+(o.type==='in'?'Внесення':'Інкасація')+(o.note?' · <i>'+esc(o.note)+'</i>':'')+(o.neg?' · <span class="dng-t">каса в мінусі</span>':'')+'</span><b class="num '+(o.type==='in'?'':'dng-t')+'">'+(o.type==='in'?'+':'−')+uah(o.amount)+'</b>'+(ops?'<button class="icobtn sm ghost" data-a="opdel" data-id="'+o.id+'" aria-label="Видалити">'+I('trash','s')+'</button>':'')+'</div>'}).join('')+
+    '<div class="mn-rr tot"><span>Має бути в касі</span><b class="num'+(dd.close<0?' dng-t':'')+'">'+uah(dd.close)+'</b></div></div>'+
     (dd.check?'':'<div class="note dng">'+I('alert')+'<span>Розбіжність у розрахунку каси — перевірте операції.</span></div>')+'</div>';
   /* розріз по способах */
   h+='<div class="card mn-card"><h3>Способи оплати</h3><div class="mn-meth">'+methodsRows(dd)+'</div>'+
@@ -280,6 +280,10 @@ function changeNotes(n){var out=[],r=Math.round(n);[500,200,100,50,20,10].forEac
 
 /* ── модалки каси ── */
 function warnClosed(date){var r=App.db.dayClose[date];return r?'<div class="note warn" style="margin-bottom:12px">'+I('lock')+'<span>День '+D.human(date)+' уже закрито — операція змінить очікувану суму в касі.</span></div>':''}
+/* рішення Егора 20.11: видача більше за касу — не відмова, а попередження з підтвердженням (ops отримує force:true) */
+function cashWarn(d,a,go){var min=App.cashMin(d);if(a<=min)return go(false);var have=Math.max(0,min);
+  UI.confirm({title:'Каса піде в мінус',text:'В касі '+uah(have)+', видаєте '+uah(a)+' — каса піде в мінус на <b class="dng-t">'+uah(a-have)+'</b>. Операцію буде позначено в журналі «каса в мінусі».',ok:'Все одно провести',danger:true}).then(function(v){if(v)go(true)})}
+App.cashWarn=cashWarn;
 function cashOpModal(d,t0){t0=t0==='in'?'in':'out';
   var m=UI.modal({title:t0==='in'?'Внесення готівки':'Вилучення з каси',sub:dayHuman(d),size:'narrow',
     body:warnClosed(d)+'<div class="col-f g12">'+segHtml([['in','Внесення'],['out','Вилучення']],t0,'data-t')+
@@ -287,13 +291,14 @@ function cashOpModal(d,t0){t0=t0==='in'?'in':'out';
       '<p class="mn-fn" data-hint></p></div>',
     foot:'<span class="sp"></span><button class="btn" data-no>Скасувати</button><button class="btn pri" data-ok>Зберегти</button>',
     onMount:function(el,close){var type=t0;
-      function hint(){var bal=App.cashBalance(d),a=num(rd(el,'amount'));el.querySelector('[data-hint]').innerHTML='Зараз у касі: <b class="num">'+uah(bal)+'</b>'+(a?' → після: <b class="num">'+uah(bal+(type==='in'?a:-a))+'</b>':'')}
+      function hint(){var bal=App.cashBalance(d),a=num(rd(el,'amount'));el.querySelector('[data-hint]').innerHTML='Зараз у касі: <b class="num">'+uah(bal)+'</b>'+(a?' → після: <b class="num'+(bal+(type==='in'?a:-a)<0?' dng-t':'')+'">'+uah(bal+(type==='in'?a:-a))+'</b>'+(type!=='in'&&a>bal?' <span class="dng-t">— каса піде в мінус на '+uah(a-Math.max(0,bal))+'</span>':''):'')}
       hint();$$('[data-t]',el).forEach(function(b){b.onclick=function(){type=b.dataset.t;setSeg(el,'data-t',type);var n=el.querySelector('[name=note]');if(!n.value||n.dataset.auto){n.value=type==='in'?'Розмінна готівка':'Інкасація у сейф';n.dataset.auto=1}hint()}});
       var n=el.querySelector('[name=note]');n.value=type==='in'?'Розмінна готівка':'Інкасація у сейф';n.dataset.auto=1;n.oninput=function(){delete n.dataset.auto};el.querySelector('[name=amount]').oninput=hint;
       el.querySelector('[data-no]').onclick=close;
       el.querySelector('[data-ok]').onclick=function(){var a=Math.round(num(rd(el,'amount')));if(a<=0)return bad(el.querySelector('[name=amount]'));
-        if(type==='out'&&a>App.cashBalance(d)){UI.toast('У касі лише '+uah(App.cashBalance(d)),{type:'err'});return bad(el.querySelector('[name=amount]'))}
-        O.cashOp({type:type,amount:a,note:rd(el,'note').trim()||(type==='in'?'Внесення':'Інкасація'),date:d});close();UI.toast((type==='in'?'Внесено ':'Інкасовано ')+uah(a));rerender()}}})}
+        var note=rd(el,'note').trim()||(type==='in'?'Внесення':'Інкасація');
+        function go(force){var o=O.cashOp({type:type,amount:a,note:note,date:d,force:force});close();UI.toast((type==='in'?'Внесено ':'Інкасовано ')+uah(a)+(o.neg?' · каса в мінусі':''),o.neg?{type:'err'}:undefined);rerender()}
+        if(type==='out')cashWarn(d,a,go);else go(false)}}})}
 
 function moveModal(d){
   var ms=payOn();
@@ -697,9 +702,10 @@ function payoutModal(sid,P,done,adv){
       el.querySelector('[data-full]').onclick=function(){amtF.value=left;upd()};el.querySelector('[data-half]').onclick=function(){amtF.value=Math.round(left/2);upd()};upd();
       el.querySelector('[data-no]').onclick=close;
       el.querySelector('[data-ok]').onclick=function(){var a=Math.round(num(amtF.value));if(a<=0)return bad(amtF);var m=rd(el,'method');
-        if(m==='cash'&&a>App.cashBalance(T())){UI.toast('У касі лише '+uah(App.cashBalance(T()))+' — інкасуйте з сейфа або оберіть інший спосіб',{type:'err'});return bad(amtF)}
-        var type=a>p.left||p.left<=0?'advance':'salary';
-        var o=O.payout({staff:sid,amount:a,type:type,method:m,note:rd(el,'note').trim()||(type==='advance'?'Аванс':'Зарплата за '+perLbl(P))});close();UI.toast((type==='advance'?'Аванс ':'Виплачено ')+uah(a)+' · '+(s.short||s.n),{undo:function(){O.remove('payouts',o.id,'Скасовано виплату');done&&done()}});done&&done()}}})}
+        var type=a>p.left||p.left<=0?'advance':'salary',note=rd(el,'note').trim()||(type==='advance'?'Аванс':'Зарплата за '+perLbl(P));
+        function go(force){
+        var o=O.payout({staff:sid,amount:a,type:type,method:m,note:note,force:force});close();UI.toast((type==='advance'?'Аванс ':'Виплачено ')+uah(a)+' · '+(s.short||s.n),{undo:function(){O.remove('payouts',o.id,'Скасовано виплату');done&&done()}});done&&done()}
+        if(m==='cash')cashWarn(T(),a,go);else go(false)}}})}
 
 function adjModal(sid,done,t0){
   var s=App.staff(sid),type=t0==='fine'?'fine':'bonus';

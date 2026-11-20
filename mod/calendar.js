@@ -1809,7 +1809,8 @@ App.checkout=function(id){
   var c=a.client&&cl(a.client);
   var mods_=mods(),payM=App.db.pay.filter(function(p){return p.on});
   var st={items:a.items.map(function(x){return {svc:x.svc,price:x.price,d:x.d}}),dtype:a.discount?a.discount.type:'pct',dv:a.discount?a.discount.v:0,
-    prods:{},cert:null,abon:null,lines:{},touched:false,given:0,tipV:0,tipM:'card',paying:false};
+    prods:{},cert:null,abon:null,lines:{},touched:false,given:0,tipV:0,tipM:'card',paying:false,
+    noPct:a.noPct!=null?!!a.noPct:App.db.settings.payroll.freeVisit==='zero'};
   var origPrices=JSON.stringify(a.items.map(function(x){return x.price}));
   function gross(){return U.sum(st.items,function(x){return +x.price||0})}
   function disc(){var g=gross();if(!st.dv)return 0;return st.dtype==='pct'?Math.round(g*Math.min(100,st.dv)/100):Math.min(g,st.dv)}
@@ -1876,11 +1877,12 @@ App.checkout=function(id){
       }
       /* ── права частина: підсумок + методи ── */
       function drawRight(){
-        var h='<section class="cal-co-sumbox" data-sum></section><section><div class="cal-h">Спосіб оплати</div><div class="cal-pm" data-pm>'+
+        var h='<section class="cal-co-sumbox" data-sum></section><div class="cal-free" data-free hidden><span class="t"><b>Без % майстру</b><small>Безкоштовний візит: майстер не отримує відсоток за цей візит</small></span>'+UI.sw('',st.noPct,'data-nopct aria-label="Без % майстру"')+'</div><section><div class="cal-h">Спосіб оплати</div><div class="cal-pm" data-pm>'+
           payM.map(function(p){return '<div class="cal-pr" data-m="'+p.id+'"><button class="cal-pn2" data-fill="'+p.id+'" title="Вся сума на цей спосіб">'+I(p.ic||'coins')+'<span>'+esc(p.n)+'</span></button><label class="inp-suf"><input type="number" min="0" step="10" inputmode="numeric" data-line="'+p.id+'" placeholder="0"><span>₴</span></label></div>'+
             (p.id==='cash'?'<div class="cal-cash" data-cashbox hidden><div class="r"><span>Дали готівкою</span><label class="inp-suf"><input type="number" min="0" step="10" inputmode="numeric" data-given placeholder="0"><span>₴</span></label></div><div class="chips" data-gq></div><div class="r chg" data-chg></div></div>':'')}).join('')+'</div><div class="cal-rem" data-rem></div></section>';
         h+='<section><div class="cal-h">Чайові <small class="mute">необовʼязково</small></div><div class="cal-tip-r"><div class="chips">'+[0,5,10,15].map(function(p){return '<button class="chip" data-tp="'+p+'" aria-pressed="false">'+(p?p+'%':'Без чайових')+'</button>'}).join('')+'</div><div class="row" style="gap:8px;margin-top:8px"><label class="inp-suf" style="flex:1"><input type="number" min="0" step="10" inputmode="numeric" data-tip placeholder="0"><span>₴</span></label><select class="sel" data-tipm style="flex:1">'+payM.map(function(p){return '<option value="'+p.id+'"'+(p.id===st.tipM?' selected':'')+'>'+esc(p.n)+'</option>'}).join('')+'</select></div></div></section>';
         R.innerHTML=h;
+        R.querySelector('[data-nopct]').onchange=function(){st.noPct=this.checked};
         syncInputs();
       }
       function syncInputs(){
@@ -1899,6 +1901,7 @@ App.checkout=function(id){
         if(abonAmt())rows.push(['Абонемент','−'+U.uah(abonAmt()),1]);
         if(prodTotal())rows.push(['Товари',U.uah(prodTotal())]);
         sum.innerHTML=rows.map(function(r){return '<div class="r'+(r[2]?' mute':'')+'"><span>'+r[0]+'</span><b>'+r[1]+'</b></div>'}).join('')+'<div class="r tot"><span>До сплати</span><b>'+U.uah(g)+'</b></div>';
+        var fr=R.querySelector('[data-free]');if(fr)fr.hidden=!(gross()>0&&disc()+rnd()>=gross());
         var remEl=R.querySelector('[data-rem]');
         remEl.className='cal-rem '+(rem===0?'ok':rem<0?'over':'');
         remEl.innerHTML=g===0?'<span>'+I('check','s')+' Доплата не потрібна</span>':rem===0?'<span>'+I('check','s')+' Розподілено повністю</span>':rem>0?'<span>Залишок</span><b>'+U.uah(rem)+'</b>':'<span>Забагато</span><b>'+U.uah(-rem)+'</b>';
@@ -1981,6 +1984,7 @@ App.checkout=function(id){
         var o={lines:lines,tips:st.tipV>0?[{method:st.tipM,amount:st.tipV}]:[],products:products,discount:st.dv>0?{type:st.dtype,v:st.dv}:null};
         if(st.cert&&certAmt()>0)o.cert={id:st.cert.id,amount:certAmt()};
         if(st.abon&&abonAmt()>0&&App.db.abons.find(function(x){return x.id===st.abon.id}))o.abon={id:st.abon.id};
+        if(gross()>0&&disc()+rnd()>=gross())o.noPct=st.noPct;
         var total=grand(),tip=st.tipV,chg=st.given>0&&(+st.lines.cash||0)>0?Math.max(0,st.given-st.lines.cash):0;
         try{App.ops.checkout(id,o)}catch(err){console.error(err);st.paying=false;return toastErr('Не вдалося провести оплату: '+err.message)}
         showDone(el,close,id,{total:total,tip:tip,change:chg});

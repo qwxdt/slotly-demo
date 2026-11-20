@@ -407,6 +407,11 @@ button.cal-wc:hover{border-color:var(--ink);}
 .cal-rem span{display:inline-flex;align-items:center;gap:6px}
 .cal-rem.ok{background:var(--st-ok);color:var(--st-ok-ink)}
 .cal-rem.over{background:var(--st-noshow);color:var(--st-noshow-ink)}
+.cal-free{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 12px;padding:10px 12px;border:1px solid var(--line-strong);border-radius:var(--r-sm)}
+.cal-free[hidden]{display:none}
+.cal-free .t{display:flex;flex-direction:column;gap:2px;min-width:0}
+.cal-free .t b{font-size:13.5px}
+.cal-free .t small{font-size:12px;color:var(--mute);line-height:1.35}
 .cal-tip-r .chip{height:30px;font-size:12.5px}
 .cal-done{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:20px 0 8px}
 .cal-done-ic{width:64px;height:64px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;margin-bottom:6px}
