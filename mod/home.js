@@ -154,7 +154,7 @@ function hmClick(e,ctx){
     if(k==='tnew')return taskForm();
     if(k==='tf')return App.setQ({f:b.dataset.f==='all'?'':b.dataset.f},true);
     if(k==='tdoneall')return App.setQ({done:ctx&&ctx.showDone?'':'1'},true);
-    if(k==='wait'){var w=JSON.parse(b.dataset.w);return App.newAppt({staff:w.staff,date:w.date,start:w.start,client:w.client})}
+    if(k==='wait'){var w=JSON.parse(b.dataset.w);return App.newAppt({staff:w.staff,date:w.date,start:w.start,client:w.client,svc:w.svc||undefined,wait:w.wait||undefined})}
     if(k==='waitdel'){App.ops.remove('waitlist',id,'Прибрано з листа очікування');App.refresh();return UI.toast('Прибрано з листа очікування')}
     if(k==='newappt')return App.newAppt({});
     if(k==='note'){return noteEdit()}
@@ -228,10 +228,12 @@ function attention(){
   var tcount=openCount();
   if(mod('tasks')&&tcount)add(App.db.tasks.some(function(t){return !t.done&&t.due&&t.due<T0})?'dng':'plain','task',plan(tcount,'задача','задачі','задач')+' на сьогодні або прострочені','Відкрийте список, щоб виконати',btn('До задач','go','data-to="tasks"'));
   /* лист очікування */
-  if(mod('waitlist'))(db.waitlist||[]).forEach(function(w){var sv=App.svc(w.svc);if(!sv||items.filter(function(i){return i.wait}).length>=2)return;
-    for(var d=(w.from<T0?T0:w.from);d<=w.to;d=D.add(d,1)){var sl=App.freeSlots(w.staff,d,sv.d).filter(function(s){return d!==T0||s>now+30});if(sl.length){var c=App.client(w.client);
-      items.push({wait:1,tone:'ok',ic:'clock',title:'Вільне вікно: '+esc(c?c.n:'клієнт з листа очікування'),sub:esc(sv.n)+' · '+esc((App.staff(w.staff)||{}).short||'')+' · '+D.human(d)+' о '+U.hm(sl[0])+(w.note?' · '+esc(w.note):''),
-        btns:btn('Записати','wait','data-w=\''+JSON.stringify({staff:w.staff,date:d,start:sl[0],client:w.client})+'\'','pri')+btn('Прибрати','waitdel','data-id="'+w.id+'"','ghost')});break}}});
+  if(mod('waitlist'))(db.waitlist||[]).forEach(function(w){var sv=App.svc(w.svc),st=w.status||'wait';if(!sv||(st!=='wait'&&st!=='offered')||items.filter(function(i){return i.wait}).length>=2)return;
+    /* fixA: ті самі вікна, що й у «Листі очікування» — з побажанням «після 17:00», будь-яким майстром і без минулого часу */
+    var r=App.waitSlots?App.waitSlots(w).filter(function(x){return x.d!==T0||x.slots.some(function(s){return s>now+30})})[0]:null;if(!r)return;
+    var s0=r.slots.filter(function(s){return r.d!==T0||s>now+30})[0],c=App.client(w.client);
+    items.push({wait:1,tone:'ok',ic:'clock',title:'Вільне вікно: '+esc(c?c.n:'клієнт з листа очікування'),sub:esc(sv.n)+' · '+esc(r.m.short||'')+' · '+D.human(r.d)+' о '+U.hm(s0)+(w.note?' · '+esc(w.note):''),
+      btns:btn('Записати','wait','data-w=\''+JSON.stringify({staff:r.m.id,date:r.d,start:s0,client:w.client,svc:w.svc,wait:w.id})+'\'','pri')+btn('Прибрати','waitdel','data-id="'+w.id+'"','ghost')})});
   /* день народження */
   db.clients.filter(function(c){return c.bd&&c.bd.slice(5)===T0.slice(5)}).slice(0,3).forEach(function(c){
     add('plain','cake','Сьогодні день народження: '+esc(c.n),'Привітайте та запропонуйте знижку',btn('Відкрити','client','data-id="'+c.id+'"'))});

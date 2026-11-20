@@ -213,7 +213,7 @@
 @media (max-width:899px){
   .mn-page .icobtn.sm{width:40px;height:40px}
   .mn-lk{min-height:36px;display:inline-flex;align-items:center;text-align:left}
-  .mn-pay .t>b{overflow:visible}
+  .mn-pay .t>b{overflow:visible;white-space:normal;overflow-wrap:anywhere}
   .mn-cl{min-height:40px}
 }
 

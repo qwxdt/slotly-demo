@@ -312,7 +312,9 @@ App.route('reports',{title:'Звіти',icon:'chart',nav:true,group:'growth',ord
   var tab=tabs.some(function(x){return x[0]===q.tab})?q.tab:'overview';
   var S=stats(P.from,P.to),Pv=P.cmp?stats(P.pf,P.pt):null;
   var ds=dataStart(),warn=P.cmp&&P.pf<ds;
-  App.setTop('<button class="btn" data-sy="rep-csv">'+ic('download')+'<span class="d-only">CSV</span></button>');
+  App.setTop('<button class="btn" data-act="rep-csv" data-sy="rep-csv">'+ic('download')+'<span class="d-only">CSV</span></button>');
+  /* fixB: кнопка в шапці (#top-x) поза v — клік через App.actions */
+  App.actions['rep-csv']=function(){U.download('slotly-'+tab+'-'+P.from+'_'+P.to+'.csv',U.csv(csvFor(tab,S,Pv,P)),'text/csv;charset=utf-8');UI.toast('Звіт експортовано')};
   var body=tab==='masters'?tabMasters(S,Pv,P):tab==='services'?tabServices(S,Pv,P):tab==='clients'?tabClients(S,Pv,P):tab==='finance'?tabFinance(S,Pv,P):tabOverview(S,Pv,P,restricted);
   var perSeg=restricted?[['today','Сьогодні'],['yday','Вчора']]:[['week','Тиждень'],['month','Місяць'],['quarter','Квартал'],['custom','Свій період']];
   v.innerHTML='<div class="page sy-page sy-rep"><div class="page-h"><div><h2>Звіти</h2><p>'+(restricted?'Підсумки дня':'Аналітика салону')+' · '+esc(P.full)+'</p></div></div>'+
@@ -529,7 +531,8 @@ var NEV=[['confirm','Підтвердження запису','Одразу пі
  ['h24','За 24 години до візиту','Клієнт підтверджує або скасовує одним дотиком'],
  ['h2','За 2 години до візиту','Коротке нагадування з адресою'],
  ['review','Запит на відгук','Після візиту, через кілька годин','reviewDelayH','год',1,48],
- ['ret','Повернення клієнта','Якщо клієнт не записався після візиту','returnDays','днів',7,180]];
+ ['ret','Повернення клієнта','Якщо клієнт не записався після візиту','returnDays','днів',7,180],
+ ['invite','Запрошення «Пора звати»','Коли минув звичний інтервал між візитами (від 3 візитів) і запису наперед немає. Не частіше разу на 30 днів']];
 function notifyHtml(){var n=gp('settings.notify')||{},x=demoCtx();if(n.ret==null)n.ret=(n.returnDays||0)>0;n.tpl=n.tpl||{};
   var casc=(n.cascade||['tg','viber','sms']).slice();
   var h='<h4 class="sy-h4" style="margin-top:4px">Події</h4><div class="sy-evs">'+NEV.map(function(e){var on=!!n[e[0]],tp=n.tpl[e[0]]||App.TPL[e[0]]||'';
@@ -563,11 +566,12 @@ function formsHtml(){
    '<div class="col-f g12">'+FORMS.map(function(f){return '<div class="card sy-form"><div class="row g12"><span class="sy-cic">'+ic('note')+'</span><div class="t sy-grow"><b>'+f[1]+'</b><small class="mute">'+f[2]+' · '+f[3].length+' питань</small></div><button class="btn sm" data-sy="form-send" data-k="'+f[0]+'">'+ic('link','s')+' Надіслати посилання</button></div><ol>'+f[3].map(function(q){return '<li>'+esc(q)+'</li>'}).join('')+'</ol></div>'}).join('')+'</div>'}
 
 /* сегменти розсилок */
-var SEGS=[['lost','Давно не були (45+ днів)'],['bd','Іменинники місяця'],['new1','Нові без 2-го візиту'],['tag','Свій тег']];
+var SEGS=[['due','Пора звати (за інтервалом)'],['lost','Давно не були (45+ днів)'],['bd','Іменинники місяця'],['new1','Нові без 2-го візиту'],['tag','Свій тег']];
 function segInfo(k,tag,cache){cache=cache||{};var T0=T(),db=App.db,ms=T0.slice(5,7),since=D.add(T0,-29);
   var got={};(db.msgs||[]).forEach(function(m){if(m.client&&m.ts.slice(0,10)>=since&&SERVICE_TPL.indexOf(m.tpl)<0)got[m.client]=1});
   var all=db.clients.filter(function(c){if(c.blocked)return false;var st=cache[c.id]||(cache[c.id]=App.clientStats(c.id));
     if(k==='lost')return st.visits>0&&st.daysSince!=null&&st.daysSince>=45&&!st.next;
+    if(k==='due')return App.callDue(c,st);
     if(k==='bd')return !!c.bd&&c.bd.slice(5,7)===ms;
     if(k==='new1')return st.visits===1&&!st.next&&st.daysSince!=null&&st.daysSince>=14;
     if(k==='tag')return !!tag&&(c.tags||[]).indexOf(tag)>=0;return false});

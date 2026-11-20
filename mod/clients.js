@@ -9,7 +9,7 @@ var U=App.u,D=App.d,UI=App.ui,O=App.ops,$=U.$,esc=U.esc,NB='\u00A0',I=App.icon;
 
 /* ═════════ довідники ═════════ */
 var SRC={ig:'Instagram',online:'Онлайн-запис',phone:'Дзвінок',walkin:'Без запису',friend:'Рекомендація',tg:'Telegram',import:'Імпорт',admin:'Адміністратор'};
-var SEGS=[['all','Усі'],['new','Нові'],['regular','Постійні'],['lost','Давно не були 60+'],['bday','Іменинники тижня'],['debt','Борг'],['blocked','Чорний список']];
+var SEGS=[['all','Усі'],['new','Нові'],['regular','Постійні'],['due','Пора звати'],['lost','Давно не були 60+'],['bday','Іменинники тижня'],['debt','Борг'],['blocked','Чорний список']];
 function debtOf(r){if(r.debt==null)r.debt=App.clientDebt(r.c.id)||0;return r.debt}
 var PAGE=50;
 function srcName(s){return SRC[s]||App.SRC[s]||s||'—'}
@@ -20,7 +20,8 @@ function tagObj(id){return App.db.tags.find(function(t){return t.id===id})}
 function copyText(t,msg){
   var ok=function(){UI.toast(msg||'Скопійовано')};
   var fb=function(){var ta=document.createElement('textarea');ta.value=t;ta.style.cssText='position:fixed;opacity:0;top:0;left:0';document.body.appendChild(ta);ta.select();try{document.execCommand('copy');ok()}catch(e){UI.toast('Не вдалося скопіювати',{type:'err'})}ta.remove()};
-  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(ok,fb)}else fb();
+  /* fixA: якщо буфер обміну не відповів (немає фокусу/дозволу) — запасний спосіб, щоб людина завжди бачила результат */
+  if(navigator.clipboard&&navigator.clipboard.writeText){var done=false,to=setTimeout(function(){if(!done){done=true;fb()}},700);navigator.clipboard.writeText(t).then(function(){if(!done){done=true;clearTimeout(to);ok()}},function(){if(!done){done=true;clearTimeout(to);fb()}})}else fb();
 }
 function normPh(s){var d=String(s||'').replace(/\D/g,'');if(!d)return {ph:'',ok:true,empty:true};
   if(d.length===10&&d[0]==='0')d='38'+d;else if(d.length===9)d='380'+d;
@@ -104,7 +105,7 @@ function baseOK(r){var c=r.c;
     if(/^[\d+\s()-]+$/.test(q)){var dg=q.replace(/\D/g,'');if(dg.length<2)return false;if(dg[0]==='0')dg=dg.slice(1);return (c.ph||'').indexOf(dg)>=0}
     var toks=q.split(/\s+/);for(var i=0;i<toks.length;i++)if(r.text.indexOf(toks[i])<0)return false}
   return true}
-function segOK(r,seg){switch(seg){case 'all':return true;case 'bday':return r.bd!=null&&r.bd<=6;case 'lostreg':return r.seg==='lost'&&r.st.visits>=2;case 'debt':return debtOf(r)>0;case 'blocked':return !!r.c.blocked||r.seg==='blocked';default:return r.seg===seg}}
+function segOK(r,seg){switch(seg){case 'all':return true;case 'bday':return r.bd!=null&&r.bd<=6;case 'lostreg':return r.seg==='lost'&&r.st.visits>=2;case 'debt':return debtOf(r)>0;case 'blocked':return !!r.c.blocked||r.seg==='blocked';case 'due':if(r.due==null)r.due=App.callDue(r.c,stats(r.c.id));return r.due;default:return r.seg===seg}}
 var SORT={last:function(r){return r.st.lastDate||''},spent:function(r){return r.st.spent},visits:function(r){return r.st.visits},name:function(r){return r.text},avg:function(r){return r.st.avg},rel:function(r){return r.rk.rel==null?-1:r.rk.rel}};
 function sortRows(rows){var f=SORT[S.sort]||SORT.last,dir=S.dir==='asc'?1:-1;
   return rows.slice().sort(function(a,b){var x=f(a),y=f(b);if(S.sort==='last'){if(!x&&y)return 1;if(x&&!y)return -1}
@@ -612,6 +613,7 @@ function tagPicker(c){
       box.addEventListener('keydown',function(e){if(e.key==='Enter'&&e.target.id==='cl-tpn')box.querySelector('[data-add]').click()});
       el.querySelector('[data-ok]').onclick=close;el.querySelector('[data-mg]').onclick=function(){close();setTimeout(tagsModal,0)}}})}
 
+App.actions['cl-cmenu']=function(e){var b=e.target.closest('[data-act]'),cc=$('#cl-card');var c=cc&&App.client(cc.dataset.id);if(b&&c)cardMenu(b,c)};
 function cardMenu(anchor,c){var vip=c.tags.indexOf('vip')>=0;
   UI.menu(anchor,[
     {t:'Редагувати',ic:'edit',fn:function(){UI.clientForm(c,function(){App.refresh()})}},

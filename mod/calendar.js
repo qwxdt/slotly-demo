@@ -189,7 +189,7 @@ function topHtml(){
   h+='<span class="sp"></span>';
   if(canAll()&&S.v!=='list'){var ms=visibleMasters();
     h+='<label class="cal-msel">'+I('user','s')+'<select class="sel" data-cal-m aria-label="Майстер"><option value="">Усі майстри</option>'+ms.map(function(m){return '<option value="'+m.id+'"'+(S.m===m.id?' selected':'')+'>'+esc(m.short)+'</option>'}).join('')+'</select></label>';}
-  if(S.v!=='list')h+='<div class="cal-zoom" title="Масштаб"><button class="icobtn sm" data-act="cal-zoom" data-z="-1" aria-label="Зменшити">'+I('minus','s')+'</button><button class="icobtn sm" data-act="cal-zoom" data-z="1" aria-label="Збільшити">'+I('plus','s')+'</button></div>';
+  if(S.v==='day'||(S.v==='week'&&S.m))h+='<div class="cal-zoom" title="Масштаб"><button class="icobtn sm" data-act="cal-zoom" data-z="-1" aria-label="Зменшити">'+I('minus','s')+'</button><button class="icobtn sm" data-act="cal-zoom" data-z="1" aria-label="Збільшити">'+I('plus','s')+'</button></div>';
   h+='<button class="icobtn sm" data-act="cal-more-menu" aria-label="Ще" title="Вид, друк, CSV">'+I('more')+'</button></div>';
   return h;
 }
@@ -1461,6 +1461,7 @@ function waitSlots(w){
   }
   return res;
 }
+App.waitSlots=waitSlots;
 function waitlistFind(id){
   var w=App.db.waitlist.find(function(x){return x.id===id});if(!w)return;
   var c=cl(w.client),sv=App.svc(w.svc),d=sv?sv.d:60;
@@ -1694,7 +1695,8 @@ function cancelAppt(a){
     }});
 }
 function deleteAppt(a,drawer){
-  UI.confirm({title:'Видалити запис?',text:'Запис «'+esc(cname(a))+'» '+esc(D.shortH(a.date)+' '+hmp(a.start))+' буде видалено разом з платежами. Для звичайного скасування краще скористатись «Скасувати».',ok:'Видалити',danger:true}).then(function(y){
+  if(App.apptPays(a).length)return toastErr('У запису є платежі — видалити не можна. Скасуйте запис і оформіть повернення');
+  UI.confirm({title:'Видалити запис?',text:'Запис «'+esc(cname(a))+'» '+esc(D.shortH(a.date)+' '+hmp(a.start))+' буде видалено. Для звичайного скасування краще скористатись «Скасувати».',ok:'Видалити',danger:true}).then(function(y){
     if(!y)return;var copy=JSON.parse(JSON.stringify(a)),pays=JSON.parse(JSON.stringify(App.apptPays(a)));
     if(drawer)drawer.close();
     App.ops.deleteAppt(a.id);
@@ -1811,7 +1813,9 @@ App.checkout=function(id){
   var origPrices=JSON.stringify(a.items.map(function(x){return x.price}));
   function gross(){return U.sum(st.items,function(x){return +x.price||0})}
   function disc(){var g=gross();if(!st.dv)return 0;return st.dtype==='pct'?Math.round(g*Math.min(100,st.dv)/100):Math.min(g,st.dv)}
-  function svcTotal(){return gross()-disc()}
+  /* «Облік → Округлення ціни»: та сама формула, що й у core (App.apptRound), щоб «До сплати» = борг після оплати */
+  function rnd(){return App.apptRound?App.apptRound({status:a.status,round:a.round,items:[]},gross()-disc()):0}
+  function svcTotal(){return gross()-disc()-rnd()}
   function prodTotal(){var s=0;Object.keys(st.prods).forEach(function(k){var p=App.db.products.find(function(x){return x.id===k});if(p)s+=p.price*st.prods[k]});return s}
   function already(){return Math.min(App.apptPaid(a),svcTotal())}
   function certAmt(){if(!st.cert)return 0;var g=App.db.certs.find(function(x){return x.id===st.cert.id});if(!g)return 0;return Math.max(0,Math.min(st.cert.amount,g.balance,svcTotal()-already()))}
@@ -1889,6 +1893,7 @@ App.checkout=function(id){
         var sum=R.querySelector('[data-sum]');
         var rows=[['Послуги',U.uah(gross())]];
         if(disc())rows.push(['Знижка'+(st.dtype==='pct'?' '+st.dv+'%':''),'−'+U.uah(disc()),1]);
+        if(rnd())rows.push(['Округлення','−'+U.uah(rnd()),1]);
         if(already())rows.push(['Вже оплачено / передоплата','−'+U.uah(already()),1]);
         if(certAmt())rows.push(['Сертифікат','−'+U.uah(certAmt()),1]);
         if(abonAmt())rows.push(['Абонемент','−'+U.uah(abonAmt()),1]);
@@ -1975,7 +1980,7 @@ App.checkout=function(id){
         var lines=pool.filter(function(x){return x.left>0}).map(function(x){return {method:x.m,amount:x.left}});
         var o={lines:lines,tips:st.tipV>0?[{method:st.tipM,amount:st.tipV}]:[],products:products,discount:st.dv>0?{type:st.dtype,v:st.dv}:null};
         if(st.cert&&certAmt()>0)o.cert={id:st.cert.id,amount:certAmt()};
-        if(st.abon&&abonAmt()>=0&&App.db.abons.find(function(x){return x.id===st.abon.id}))o.abon={id:st.abon.id};
+        if(st.abon&&abonAmt()>0&&App.db.abons.find(function(x){return x.id===st.abon.id}))o.abon={id:st.abon.id};
         var total=grand(),tip=st.tipV,chg=st.given>0&&(+st.lines.cash||0)>0?Math.max(0,st.given-st.lines.cash):0;
         try{App.ops.checkout(id,o)}catch(err){console.error(err);st.paying=false;return toastErr('Не вдалося провести оплату: '+err.message)}
         showDone(el,close,id,{total:total,tip:tip,change:chg});

@@ -46,12 +46,15 @@ function printDoc(title,html,css){
   setTimeout(function(){try{f.contentWindow.focus();f.contentWindow.print()}catch(e){}setTimeout(function(){f.remove()},5000)},400)}
 
 /* ───────── власні ops (журнал + save) ───────── */
-O.moveMoney=function(o){var db=App.db,pair=U.uid('mv'),date=o.date||T(),a=Math.abs(Math.round(o.amount)),ts=nowTs(date);
+O.moveMoney=function(o){var db=App.db,pair=U.uid('mv'),date=o.date||T(),a=o.amount,ts=nowTs(date);
+  /* fixB: переміщення теж гроші — права, ціле >0, різні способи, закрита каса, каса не в мінус */
+  App.needPerm('cash.ops');if(typeof a!=='number'||!isFinite(a)||a!==Math.round(a)||a<=0)App.moneyErr('Сума переміщення має бути цілим числом більше нуля');
+  if(!o.from||!o.to||o.from===o.to)App.moneyErr('Оберіть два різні способи оплати');var cash=o.from==='cash'||o.to==='cash';App.needOpen(date,cash);if(o.from==='cash')App.needCash(date,a);
   var base={appt:null,date:date,ts:ts,kind:'transfer',staff:null,by:db.meId,pair:pair,note:o.note||''};
   db.payments.push(Object.assign({id:U.uid('p'),method:o.from,amount:-a},base));
   db.payments.push(Object.assign({id:U.uid('p'),method:o.to,amount:a},base));
   App.log('move','move:'+pair,'Переміщення '+uah(a)+': '+mName(o.from)+' → '+mName(o.to)+(o.note?' — '+o.note:''));App.save();return pair};
-O.deleteMove=function(pair){var db=App.db,arr=db.payments.filter(function(p){return p.pair===pair});db.payments=db.payments.filter(function(p){return p.pair!==pair});App.log('delete','move:'+pair,'Скасовано переміщення між способами');App.save();return arr};
+O.deleteMove=function(pair){var db=App.db,arr=db.payments.filter(function(p){return p.pair===pair});App.needPerm('cash.ops');if(arr.some(function(p){return p.method==='cash'}))App.needOpen(arr[0].date,true);if(arr.some(function(p){return p.method==='cash'&&p.amount>0}))App.needCash(arr[0].date,arr.filter(function(p){return p.method==='cash'})[0].amount);db.payments=db.payments.filter(function(p){return p.pair!==pair});App.log('delete','move:'+pair,'Скасовано переміщення між способами');App.save();return arr};
 O.restoreMove=function(arr){arr.forEach(function(p){App.db.payments.push(p)});App.log('create','move:'+(arr[0]&&arr[0].pair),'Відновлено переміщення');App.save()};
 O.deleteCashOp=function(id){var db=App.db,o=db.cashOps.find(function(x){return x.id===id});db.cashOps=db.cashOps.filter(function(x){return x.id!==id});App.log('delete','cash:'+id,'Видалено касову операцію '+(o?uah(o.amount):''));App.save();return o};
 O.restoreCashOp=function(o){App.db.cashOps.push(o);App.log('cash','cash:'+o.id,'Відновлено касову операцію');App.save()};
@@ -188,7 +191,7 @@ function renderCash(view,params,q){
     var gi=groupInfo(gr,d);
     return '<div class="li mn-pay '+gi.cls+'"><span class="mn-tm num">'+tm(gr.items[0])+'</span><div class="t"><b class="ell">'+(gi.appt?'<button class="mn-lk" data-a="appt" data-id="'+gi.appt.id+'">'+esc(gi.t)+'</button>':esc(gi.t))+'</b><small class="mn-sub">'+esc(gi.s)+'</small>'+
       '<div class="mn-lines">'+gr.items.map(function(p){return '<span class="mn-ln'+(p.kind==='tip'?' tip':'')+(p.amount<0?' neg':'')+'">'+esc(mName(p.method))+' · '+(KIND[p.kind]||p.kind)+' <b class="num">'+(p.amount>0&&gr.pair?'+':'')+fmt(p.amount)+'</b></span>'}).join('')+'</div></div>'+
-      '<div class="mn-r"><b class="num mn-amt">'+uah(gi.total)+'</b>'+(ops||gi.appt?'<button class="icobtn sm ghost" data-a="paymenu" data-k="'+gr.k+'" aria-label="Дії">'+I('more')+'</button>':'')+'</div></div>'}).join('')+'</div>';
+      '<div class="mn-r"><b class="num mn-amt">'+uah(gi.total)+'</b>'+(gi.appt||(gr.pair&&ops)?'<button class="icobtn sm ghost" data-a="paymenu" data-k="'+gr.k+'" aria-label="Дії">'+I('more')+'</button>':'')+'</div></div>'}).join('')+'</div>';
   h+='</div>';
   /* витрати + виплати + операції */
   var rowsOut=[];
@@ -572,15 +575,16 @@ function perLbl(p){var a=D.parse(p.from),b=D.parse(p.to);if(p.from.slice(0,7)===
 /* обгортка над App.payroll: сума == сума рядків; фікс «за місяць» пропорційно періоду */
 function PR(id,from,to){
   var s=App.staff(id),p=App.payroll(id,from,to),cfg=s.pay||{};
-  var fixed=0;if(cfg.type==='fixed'||cfg.type==='fixed_pct'){var f=cfg.fixed||0;
+  var fixed=0;if(cfg.type==='fixed'||cfg.type==='fixed_pct'){var f=App.fixedOn?App.fixedOn(s,to):(cfg.fixed||0);
     if(from===D.monthStart(from)&&to===D.monthEnd(from))fixed=f;
     else if(from.slice(0,7)===to.slice(0,7)&&((from.slice(8)==='01'&&to.slice(8)==='15')||(from.slice(8)==='16'&&to===D.monthEnd(from))))fixed=Math.round(f/2);
     else fixed=Math.round(f*(D.diff(from,to)+1)/(+D.monthEnd(from).slice(8)))}
   var svcEarn=sum(p.lines,function(l){return l.earn}),svcSum=sum(p.lines,function(l){return l.base});
-  p.svcEarn=svcEarn;p.svcSum=svcSum;p.fixed=fixed;p.total=svcEarn+p.tips+p.prodEarn+fixed+p.bonus-p.fine;p.left=p.total-p.paid;
+  p.svcEarn=svcEarn;p.svcSum=svcSum;p.fixed=fixed;p.total=svcEarn+p.tips+p.prodEarn+fixed+p.bonus-p.fine;p.left=p.total-p.paid+(p.carry||0);
   p.cfg=cfg;p.tipsAll=App.db.payments.filter(function(x){return x.kind==='tip'&&x.staff===id&&x.date>=from&&x.date<=to});
   p.prodAll=App.db.payments.filter(function(x){return x.kind==='product'&&x.staff===id&&x.date>=from&&x.date<=to});
   return p}
+App.payrollView=PR;
 function ruleLbl(s,p){var c=s.pay||{type:'pct'},base=p?p.pct:(c.pct!=null?c.pct:(App.level(s.lvl)||{}).pct||0);var ov=c.svc?Object.keys(c.svc).length:0;
   if(c.type==='fixed')return 'фікс '+uah(c.fixed||0)+'/міс';
   var t=U.pct(base)+(ov?' + '+ov+' '+plural3(ov,'виняток','винятки','винятків'):'');
@@ -754,7 +758,7 @@ function paySlip(sid,P,per){
   var adj=db.payouts.filter(function(x){return x.staff===sid&&x.date>=P.from&&x.date<=P.to});
   var html='<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><h1 style="font-size:22px">Розрахунковий лист</h1><div class="mute" style="margin-top:4px">'+esc(sal.name)+' · '+esc(sal.city+', '+sal.addr)+'</div></div><div style="text-align:right"><div class="b">'+esc(s.n)+'</div><div class="mute">'+esc(s.spec||'')+'</div><div class="mute">'+esc(PER[per])+': '+esc(D.human(P.from,{year:true}))+' – '+esc(D.human(P.to,{year:true}))+'</div></div></div>'+
    '<div class="sec">Підсумок</div><table><tbody><tr><td>Послуги: '+p.visits+' візит. на '+uah(p.svcSum)+' ('+esc(ruleLbl(s,p))+')</td><td class="r">'+uah(p.svcEarn)+'</td></tr>'+(p.fixed?'<tr><td>Фіксована частина</td><td class="r">'+uah(p.fixed)+'</td></tr>':'')+(p.prodEarn?'<tr><td>Товари: '+uah(p.prod)+' × '+(p.cfg.productPct||0)+'%</td><td class="r">'+uah(p.prodEarn)+'</td></tr>':'')+(p.tips?'<tr><td>Чайові</td><td class="r">'+uah(p.tips)+'</td></tr>':'')+(p.bonus?'<tr><td>Премії</td><td class="r">'+uah(p.bonus)+'</td></tr>':'')+(p.fine?'<tr><td>Штрафи</td><td class="r">−'+uah(p.fine)+'</td></tr>':'')+
-   '<tr class="tot"><td>Нараховано</td><td class="r">'+uah(p.total)+'</td></tr><tr><td>Виплачено за період</td><td class="r">−'+uah(p.paid)+'</td></tr><tr class="tot"><td>До виплати</td><td class="r">'+uah(p.left)+'</td></tr></tbody></table>'+
+   '<tr class="tot"><td>Нараховано</td><td class="r">'+uah(p.total)+'</td></tr><tr><td>Виплачено за період</td><td class="r">−'+uah(p.paid)+'</td></tr>'+(p.carry?'<tr><td>Аванс понад нараховане з минулого періоду</td><td class="r">−'+uah(-p.carry)+'</td></tr>':'')+'<tr class="tot"><td>До виплати</td><td class="r">'+uah(p.left)+'</td></tr></tbody></table>'+
    (adj.length?'<div class="sec">Виплати та коригування</div><table><tbody>'+adj.map(function(x){return '<tr><td>'+esc(D.human(x.date))+' · '+payoutLabel(x.type)+(x.note?' — '+esc(x.note):'')+'</td><td class="r">'+(x.type==='fine'?'−':'')+uah(x.amount)+'</td></tr>'}).join('')+'</tbody></table>':'')+
    '<div class="sec">Візити</div><table><thead><tr><th>Дата</th><th>Послуга</th><th class="r">База</th><th class="r">%</th><th class="r">Заробіток</th></tr></thead><tbody>'+lines.map(function(l){return '<tr><td>'+D.shortH(l.date)+'</td><td>'+esc(svcName(l.svc))+' <span class="mute">· '+esc(cname(l.client))+'</span></td><td class="r">'+fmt(l.base)+'</td><td class="r">'+(l.pct||0)+'</td><td class="r">'+fmt(l.earn)+'</td></tr>'}).join('')+'</tbody></table>'+
    '<div style="display:flex;gap:40px;margin-top:36px"><div style="flex:1;border-top:1px solid #121214;padding-top:4px" class="mute">Роботодавець</div><div style="flex:1;border-top:1px solid #121214;padding-top:4px" class="mute">Співробітник</div></div>';
